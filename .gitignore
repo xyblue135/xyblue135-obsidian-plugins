@@ -1,0 +1,65 @@
+# ===================================================================
+# 这是「Obsidian 插件仓库」（公开）。
+# 仓库根 = <vault>/.obsidian/plugins/
+# 只放插件本体：main.js / manifest.json / styles.css / README / src / lib / 模板资源 …
+#
+# 为什么根放在 plugins 而不是 .obsidian：
+#   .obsidian 里还躺着 Obsidian 本体的个人配置（app.json / workspace.json /
+#   hotkeys.json / snippets / themes …），那些既不该公开、也不叫「插件」。
+#   把根下移到 plugins，git 的工作区就等于「要备份的东西」本身，
+#   用 `git status` 一眼就能看出哪个插件有新改动、哪个新装的插件还没入库。
+#
+# 密钥约定（重要）：
+#   data.json         → 真实配置，含明文 key，**永不入库**
+#   data.example.json → 模板，key 留空，**要入库**，供他人照抄
+#   新增插件时照此补一份 example，并在该插件 README 里写清「填哪些字段」。
+# ===================================================================
+
+# -------- 插件个人数据（含明文 apiKey）--------
+# 真实配置：任何形态都不入库（模板 data.example.json 不匹配这些规则，会正常入库）
+*/data.json
+*/data.json.*
+*/data.json.bak*
+*/data.json.probe
+*/data.local.json
+*/data.*.bak
+*/secrets.json
+*/credentials.json
+
+# 万一有人把 example 抄坏了、把 key 填进了 example
+# （靠 tools/check-secrets.js 兜底检查，这条只是最后一道保险）
+*/data.example.local.json
+
+# -------- 插件运行时产物（可重建 / 体积大）--------
+*/index.json
+*/reports/
+node_modules/
+*/node_modules/
+
+# -------- 按库配置的插件参数（不属于源码）--------
+# docs-logo 的白名单与图标映射是「这个库」的配置，换库就失效，不算插件代码
+00_xyblue135-docs-logo/icons.json
+00_xyblue135-docs-logo/whitelist.json
+
+# -------- 临时备份 --------
+*.bak
+*.prefix-bak
+*.prefix-bak[0-9]
+*.pre-audit.bak
+.workbuddy/
+
+# -------- 通用 --------
+.DS_Store
+Thumbs.db
+
+# -------- 凭证类文件（任何位置都不入库）--------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+*.kdbx
