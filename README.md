@@ -48,20 +48,7 @@ xyblue135 的 Obsidian 插件合集（自研 13 个 + 打包的第三方 6 个�
 | `00_xyblue135-undone-workbench` | 0.1.2 | 筛选 `status: undone` 笔记并逐篇引导处理（缺失项分析 / 联动补全） |
 | `00_xyblue135-video-triage` | 0.1.1 | B 站链接 → 字幕 → 要点 → 知识库比对 → 三档判定 → 自动写信箱笔记 |
 
-### 2026-11 的合并（17 → 14）
-
-三个插件被并入别处，不是功能被砍，而是**职责本来就重叠**——拆着反而要跨插件读对方的 `data.json`：
-
-| 被并入 | 并入到 | 为什么 |
-|---|---|---|
-| `docs-template`（元数据补全） | `metadata-ai` | 新建笔记补字段 vs 已有笔记补字段，是同一件事的两个时机；字段清单原本在 A 插件、字段顺序在 B 插件，靠启动顺序碰运气 |
-| `job-lens`（岗位透镜） | `skill-miner` | 岗位透镜只读 `skill-miner/data.json` 做比对，本质是这个插件的第二个视图 |
-| `interview-rag`（面试检索） | `ai-search` | 两套索引算法几乎逐行相同、白名单同一份、索引文件 4.6MB 各存一份；面试只是「另一套评分权重 + 一个文件握手」 |
-
-视图 id（`xyblue135-job-lens-view`）与旧 `data.json` 里的设置会自动迁移（`migratedFrom*` 标记防重跑），
-已打开的面板不会变空白；命令 id 变了（加了 `job-lens-` / `template-` / `iv-` 前缀），之前绑的热键要重绑。
-
-### 侧边栏图标怎么变成现在这样
+### 侧边栏图标显示规则
 
 侧栏（ribbon）放哪些图标**不由插件决定，由 CSS 片段决定**：
 `snippets/xyblue135-brand.css` 里有一份「隐藏清单」，按 `aria-label` 精确匹配把图标 `display:none`。
@@ -97,6 +84,24 @@ xyblue135 的 Obsidian 插件合集（自研 13 个 + 打包的第三方 6 个�
 插件内仍保留的按键都是**输入框内行为**，与全局热键无关：
 搜索框的 `Enter` / `Ctrl+Enter`（提交/追问）、归档面板的 `↑↓ Enter`、
 `mirror` 在文件树里拦 `Delete` 弹附件回收确认、`image-zoom` 的 `Shift/Alt + 滚轮`（鼠标手势）。
+
+### 重建检索索引（建议让 agent 跑）
+
+索引是 `00_xyblue135-ai-search/index.json`，**不在 git 里**，删了也能重建。
+界面上有「重建检索索引」按钮和命令，但点了之后只能看状态栏，出问题看不到原因。
+要核对结果时直接让 agent 跑：
+
+```bash
+cd .obsidian/plugins/00_xyblue135-ai-search
+node tools/rebuild-index.js --dry   # 先看统计，不写盘
+node tools/rebuild-index.js         # 真重建
+```
+
+不用开 Obsidian、不联网、不调接口，输出里有「进索引多少篇 / 多少篇没有正文 / 
+有没有埋 fmFallback 雷 / 回读能否 load」四项硬指标。判读标准与排错见
+[`00_xyblue135-ai-search/README.md`](00_xyblue135-ai-search/README.md) 的「索引」章节。
+
+**改完索引要重启 Obsidian**，否则内存里的旧索引会在保存时把文件覆盖回去。
 
 ## 打包的第三方插件
 

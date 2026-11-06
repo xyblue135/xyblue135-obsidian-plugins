@@ -81,11 +81,84 @@ answer.json = {"id": <同 id>, "answer": "...", "sources": [{"path", "title"}]}
 
 ## 索引
 
-- 索引存在插件目录的 `index.json`（**不入 git**，可由「重建检索索引」随时重建）；检索与面试共用
-- 启动时增量比对文件 hash，只重建变动的笔记
-- `autoRebuildHours` > 0 时定期全量重建（默认 0 = 关闭）
-- 只索引白名单目录（默认 `my_blog/00_docs`，含子目录）
-- 面试监听在**索引加载完成后**才启动，避免启动瞬间的提问查到空索引
+索引存在插件目录的 `index.json`（**不入 git**），检索与面试共用同一份。
+启动时增量比对文件 hash，只重建变动的笔记；`autoRebuildHours > 0` 时定期全量重建（默认 0 = 关）。
+只索引白名单目录（`whitelistFolder`，默认 `my_blog/00_docs` + `my_blog/00_agent_for_projects`，含子目录）。
+面试监听在**索引加载完成后**才启动，避免启动瞬间的提问查到空索引。
+
+### 什么时候需要重建
+
+| 情况 | 说明 |
+|---|---|
+| 状态栏显示「0 篇」 | 索引没加载上，先重建 |
+| 大批笔记改过名 / 挪过目录 | 增量比对按路径认文件，搬家会留残影 |
+| 改了白名单目录 | 旧索引的 `whitelist` 不匹配会被整体丢弃，必须重建 |
+| 新笔记死活搜不到 | 先确认它在白名单目录里，再重建 |
+| 升级插件后 | 索引结构与插件版本绑定，可能需重建 |
+
+### 怎么重建（三选一）
+
+**① 面板工具栏**：检索框右侧 🔄 —— 普通重建，只处理变动项。
+
+**② 命令面板**：搜「重建检索索引」—— 强制全量，清空后重扫。
+
+**③ 让 agent 离线重建（推荐）**
+
+前两种要 Obsidian 开着、点按钮、等状态栏跑完，中间看不到任何细节。第三种在终端里跑，
+能直接拿到「扫了多少 / 进索引多少 / 多少篇没有正文 / 有没有埋雷」的数字，出问题当场能定位。
+
+```bash
+cd <vault>/.obsidian/plugins/00_xyblue135-ai-search
+node tools/rebuild-index.js          # 真重建并写盘
+node tools/rebuild-index.js --dry    # 只看统计，不写盘
+```
+
+脚本走的是插件自己的 `reconcile()` + `saveNow()`，产物与点按钮完全同构
+（`tools/offline-harness.js` 提供假 obsidian 模块，不启动 Obsidian、不联网、不调 API）。
+正常输出：
+
+```
+vault 内 .md 总数      : 796
+白名单内（进索引）      : 765
+  ├ 新增 / 更新        : 765 / 0
+  ├ 正文为空（纯元数据）: 14 ← 只有 frontmatter，靠摘要文本检索
+  └ strongText 为空的   : 0
+正文总字数             : 2,134,665
+耗时                   : 0.7 s
+
+index.json            : 4.44 MB
+  version / files     : 1 / 765
+  whitelist           : my_blog/00_docs,my_blog/00_agent_for_projects
+  fmFallback 标记     : 0 （无，正常）
+  重新 load()         : OK docs = 765
+```
+
+**判读标准**
+
+- `白名单内` 应等于白名单目录里的 md 数量。少于它 = 白名单配错，或有文件读不到
+- `strongText 为空的` 必须是 0。非 0 说明这些笔记连标题都没解析出来，搜不到
+- `fmFallback 标记` 必须是 0。非 0 表示写入时元数据没就绪，Obsidian 下次启动会把全部文档重解析一遍
+- `重新 load()` 必须 `OK`，且 `docs` 与 `files` 相等
+
+**注意**
+
+- Obsidian 开着时改 `index.json`，关掉面板前可能被内存里的旧索引覆盖 —— **重建完重启一次 Obsidian**
+- `index.json.tmp` 是原子写的中间产物，残留可直接删
+- 重建不花钱、不调接口；向量是另一回事，见下
+
+### 为什么有的笔记搜出来没有正文
+
+约 47 篇笔记的 frontmatter 占了全文 85% 以上——内容全在 `AI_summary_long` / `AI_take` / `AI_qa` 里，
+正文是空的（多为「待补正文的占位笔记」）。索引把 `title` / `AI_title` / `tags` / `AI_summary_short` /
+`AI_summary_long` 都算作检索文本，所以这些笔记搜得到；结果行没有正文片段时用摘要兜底显示。
+想彻底解决只能补正文，补完重建会自动收进去。
+
+### 语义向量（可选，默认关）
+
+`embeddingEnabled` 默认 `false`。开启后走 `/v1/embeddings` 给每篇算向量，用于语义召回。
+**开之前先看代价**：当前模型 `gemini-embedding-001` 是 3072 维，以 JSON 数字数组存进 `index.json`，
+每篇约 40 KB —— 765 篇会把索引从 4.4 MB 撑到 30 MB 上下，而且每批 16 篇就要整份重写一次盘。
+要开建议先把维度降下来（`dimensions` 参数或量化），否则重建会明显卡顿。
 
 ## 设置
 
@@ -115,7 +188,6 @@ answer.json = {"id": <同 id>, "answer": "...", "sources": [{"path", "title"}]}
 **面试 · AI 与直答**：`ivAiEnabled`、`ivModel`、`ivTimeoutMs`、`ivMaxTokens`、`ivContextDocs`、
 `ivContextCharsPerDoc`、`ivAiAssist`、`ivAiFallbackLocal`、`ivAiSystemPrompt`、`ivSpokenEnabled`、
 `ivSpokenSystemPrompt`、`ivSpokenPromptPresets`
-
 
 > `ivModel` 单独填的理由：面试要 3~5 秒出话，主检索可以慢慢精排。实测
 > `cndeepseek-v4-flash` 平均 5.2s、内容最完整；`cnminimax-m3` 4.7s 偏短；`cnhy3` 4.4s 最省字但偏浅；

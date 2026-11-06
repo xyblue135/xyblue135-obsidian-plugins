@@ -1440,7 +1440,10 @@ class AISearchModal extends Modal {
       row.appendChild(tags);
     }
     const terms = this.currentTerms();
-    const snippet = makeSnippet(r.section, terms);
+    // 纯元数据笔记（正文为空、内容全在 frontmatter 的 AI 摘要里）没有 section，
+    // 不能因此把结果行渲染成空白——用摘要兜底，否则看起来就像「索引是空的」。
+    let snippet = makeSnippet(r.section, terms);
+    if (!snippet) snippet = (r.doc.summaryShort || r.doc.summaryLong || '').slice(0, 160);
     if (snippet) {
       const sn = el('div', 'xyais-row-snippet');
       sn.innerHTML = highlight(snippet, terms);

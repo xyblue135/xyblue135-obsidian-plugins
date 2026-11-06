@@ -1,7 +1,7 @@
 {
   "id": "00_xyblue135-ai-search",
   "name": "xyblue135 · AI 检索",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "minAppVersion": "1.5.0",
   "description": "【xyblue135 开源插件】本地召回 + AI 精排两阶段检索白名单文章，支持语义向量召回（可选）、标签/深度过滤、流式 AI 问答与引用跳转；并含面试问答模式（ragfile 桥接 + 第一人称直答）。接口与 AI 元数据插件一致（OpenAI 兼容）。",
   "author": "xyblue135",
