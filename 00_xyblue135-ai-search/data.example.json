@@ -1,0 +1,7 @@
+{
+  "baseUrl": "http://127.0.0.1:31415/v1",
+  "apiKey": "",
+  "model": "auto",
+  "whitelistFolder": "my_blog/00_docs,my_blog/00_agent_for_projects",
+  "includeSubfolders": true
+}

@@ -17,3 +17,13 @@
 ## 学习闭环
 
 岗位透镜（市场要求什么）→ 收件箱待办 → 待完成工作台逐篇处理 → 新笔记提升技能矩阵 → 重跑分析看匹配度上涨。
+
+## 配置与密钥
+
+本插件**不单独存密钥**，AI 调用复用 `skill-miner` 的设置
+（`data.json` 里的 `skillMinerId` 指定用哪个库的配置）。
+所以只要 `00_xyblue135-skill-miner` 那边填好了 `apiKey`，这里就能用。
+
+其余配置（`inbox`、`lastRole`、`history`、`reportPaths`）属于个人数据，
+存在本目录的 `data.json`，不进 git。
+

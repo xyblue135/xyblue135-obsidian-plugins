@@ -46,6 +46,23 @@
 - 被 `00_xyblue135-skill-miner` 调用（`openSearchWithQuery`），带初始关键词直接打开检索。
 - 接口约定与 `00_xyblue135-metadata-ai` 一致（OpenAI 兼容），可共用同一个本地网关。
 
+## 配置与密钥
+
+配置存在插件目录的 `data.json`，**不进 git** —— 里面是明文 API Key。
+仓库里只放模板 `data.example.json`，第一次用照抄一份即可：
+
+```bash
+cd .obsidian/plugins/00_xyblue135-ai-search
+cp data.example.json data.json
+# 然后编辑 data.json，把下面这些字段填上
+```
+
+本插件需要填的凭证字段：`apiKey`（兼容 OpenAI 的接口密钥）
+
+> ⚠️ 填好 key 的 `data.json` 永远不要提交。
+> 提交前在 `.obsidian` 目录跑 `node tools/check-secrets.js`，
+> 扫到疑似密钥会返回非 0 并列出位置。
+
 ## 注意
 
 - **索引里的 `path` 用库内相对路径**，改白名单目录或大规模移动笔记后建议重建一次索引。

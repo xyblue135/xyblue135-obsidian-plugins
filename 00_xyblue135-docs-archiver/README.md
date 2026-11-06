@@ -36,6 +36,23 @@
 | `profileTagLimit` | 6 | 喂给 AI 的笔记最多带几个标签 |
 | `profileTitleLimit` | 2 | 喂给 AI 的标题词数量 |
 
+## 配置与密钥
+
+配置存在插件目录的 `data.json`，**不进 git** —— 里面是明文 API Key。
+仓库里只放模板 `data.example.json`，第一次用照抄一份即可：
+
+```bash
+cd .obsidian/plugins/00_xyblue135-docs-archiver
+cp data.example.json data.json
+# 然后编辑 data.json，把下面这些字段填上
+```
+
+本插件需要填的凭证字段：`aiApiKey` —— 注意字段名是 `aiApiKey`，不是 `apiKey`
+
+> ⚠️ 填好 key 的 `data.json` 永远不要提交。
+> 提交前在 `.obsidian` 目录跑 `node tools/check-secrets.js`，
+> 扫到疑似密钥会返回非 0 并列出位置。
+
 ## 注意
 
 - 只处理 `notesRoot` 下的 Markdown，其他位置不接管。

@@ -1,17 +1,121 @@
 {
   "settings": {
-    "baseUrl": "http://127.0.0.1:3001/v1",
+    "settingsVersion": 1,
+    "baseUrl": "http://127.0.0.1:31415/v1",
     "apiKey": "",
     "model": "auto",
-    "whitelistFolder": "00_docs",
+    "whitelistFolder": "my_blog/00_docs,my_blog/00_agent_for_projects",
+    "recheckAgeDays": 90,
+    "autoInspectionHours": 0,
     "summaryShortMaxChars": 100,
+    "summaryShortMaxCharsEnabled": true,
     "summaryLongMaxChars": 300,
+    "summaryLongMaxCharsEnabled": true,
+    "summaryMarkdownCleanupEnabled": false,
     "contentFingerprintEnabled": false,
+    "maxTags": 7,
     "autoUpdateEnabled": false,
-    "experimentalCombinedRequestEnabled": true,
-    "technicalDepthHarnessEnabled": true
+    "autoUpdateMinutes": 60,
+    "statusDoneOnlyEnabled": true,
+    "requestTimeoutSeconds": 180,
+    "requestIntervalSeconds": 10,
+    "experimentalCombinedRequestEnabled": false,
+    "feedMetadataToAiEnabled": false,
+    "feedTitleToAiEnabled": true,
+    "clearFieldsBeforeRunEnabled": true,
+    "structuredJsonModeEnabled": true,
+    "jsonRepairEnabled": true,
+    "statusBarEnabled": true,
+    "summaryShortHarnessEnabled": true,
+    "summaryLongHarnessEnabled": true,
+    "tagsHarnessEnabled": true,
+    "technicalDepthHarnessEnabled": true,
+    "tagCaseNormalizationEnabled": true,
+    "technicalTagCanonicalList": "Linux\nPrometheus\nGrafana\nDocker\nKubernetes\nK8s\nNginx\nMySQL\nPostgreSQL\nRedis\nMongoDB\nGit\nGitHub\nGitLab\nJenkins\nAnsible\nTerraform\nPython\nJava\nJavaScript\nTypeScript\nNodeJS\nReact\nVue\nAngular\nSpring\nSpringBoot\nOpenAI\nChatGPT\nObsidian\nSelenium\nFFmpeg\nFluent\nUnity\nYOLO\nPyTorch\nTensorFlow\nCUDA\nOpenCV\nNumPy\nPandas\nScikitLearn\nREST\nHTTP\nHTTPS\nTCP\nUDP\nDNS\nSSH\nTLS\nJSON\nYAML\nXML\nHTML\nCSS\nSQL\nNoSQL\nAPI\nSDK\nCI\nCD\nDevOps\nMLOps\nLLM\nRAG\nNacos\nZabbix\nLoki\nPromtail\nSkyWalking\ncpp",
+    "summaryShortHarness": "语言：中文。\n用途：用于文章列表、搜索结果、悬浮预览和快速识别主题。\n形式：只输出一个自然、完整的单句摘要，不换行。\n内容：优先保留核心对象或技术主题、核心问题，以及最主要的解决方案、结论或知识点；保留最有辨识度的技术名词和关键参数，但不要展开完整排查过程。\n表达：必须是自然中文，不要写成电报体、日志体、参数串或关键词堆砌；不要为了压缩大量使用 /、+、→ 等符号代替正常语言关系。\n不要使用‘本文介绍了’、‘这篇文章讲了’、‘这篇笔记主要是’等套话；不要 Markdown、标题、引号或前后解释。\n要一两句话总结出来 不要超过100字符",
+    "summaryLongHarness": "语言：中文。\n很重要的 生成的内容禁止超过300字符 如果预算超过\n可以删除标点符号和口水话\n用途：生成 summary_long，用于理解整篇文章结构，并服务于 AI 分类、技术含量判断、搜索、相关文章推荐、RAG 和文章排序。\n形式：输出一段自然、完整的内容摘要，可使用 2～3 个完整句子，但不要换行。\n目标：生成‘文章内容总览’，而不是最终结论、技术速记或参数清单；读者只阅读摘要，就应大致知道文章的背景问题、关键排查或分析过程、主要技术方案、涉及的重要技术点，以及最终结论、限制或待验证问题。\n内容要求：正文中存在时，应尽可能覆盖核心对象/背景问题、关键实验或测试数据、判断依据与因果关系、最终技术方案、关键参数/组件/接口/算法/工具，以及重要注意事项、风险、限制、异常现象或待验证问题。\n不要只写‘问题 + 最终方案’；如果正文包含排查、测试、选型、实现和风险分析，应尽量把这些阶段都压缩进摘要。\n优先保留具有检索价值和技术辨识度的具体信息，例如型号、技术名词、接口名称、关键数值、测试结果、核心模块和异常现象；不要用‘进行了测试’‘采用相关方法’等模糊概括替代具体内容。\n表达：使用自然、完整、连贯的中文叙述，不要写成电报体、日志体、关键词堆叠或参数串；避免大量使用 /、+、→ 等符号代替正常语言关系。允许使用‘针对……’‘通过……发现……’‘进一步……’‘同时……’等连接方式。\n不要使用‘本文介绍了’、‘这篇文章介绍了’、‘这篇笔记讲了’等空泛开场；不要 Markdown、标题、引号或前后解释。\n长度：如果内容过多，优先压缩措辞，而不是删除关键技术阶段。\n禁止输出类似‘设备故障，测试A/B得出结论；使用模块X、Y完成改造，信号Z待验证’这种高度压缩的技术速记，必须改写成自然的文章概述。\n",
+    "tagsHarness": "最多输出5个互不重复的标签 value；在最多 5个标签内尽量覆盖不同的高信息量技术维度。优先质量，不要为了凑数量加入泛化、重复或低信息量标签；\n不允许超过5个标签 按照得分取前五个输出\n不得使用 skill/Linux、domain/云计算 这类层级前缀。\n当具体技术词和泛化概念表达相近时，具体技术词必须明显更高。例如 FFmpeg≈0.98，视频转码≈0.72，格式转换≈0.45；不要让‘格式转换’这类泛词压过 FFmpeg。\n建议权重层级：核心具体技术 0.90~1.00；具体机制/算法/协议/格式 0.80~0.94；明确任务或领域 0.60~0.79；泛化动作/用途 0.30~0.59。\n避免同义词、近义重复、上下位概念重复占位。\n",
+    "technicalDepthHarness": "角色：技术内容评审员\n任务：对输入技术文章的技术深度打0-100整数分\n\n【核心原则】\n1. 仅评估5个维度：机制深度、工程实现复杂度、系统复杂度、分析验证强度、前置知识密度\n2. 与文笔、字数、代码量、术语数量无关；纯操作教程、命令合集、安装步骤类不得高分\n3. 100分为固定专家级标尺，不对文章强行归一化，普通技术博客不超过90分\n4. 通读全文后评分，不得仅凭标题、摘要判断\n\n【评分维度（总分100）】\n1. 机制深度（28分）：考察底层原理与内部运行逻辑；仅讲操作命令、配置步骤不得高分\n2. 工程实现（24分）：考察多组件协作、架构部署、性能调优、工程取舍；单纯软件安装、基础配置为低分\n3. 分析与验证（19分）：考察是否形成完整分析闭环；仅给结论无推导验证过程不得高分\n4. 系统复杂度（17分）：考察跨技术层级的关联深度；仅罗列产品名称不加分\n5. 前置知识密度（12分）：考察理解内容所需的技术门槛；单纯术语堆砌不代表密度高\n\n【档位参考】\n0-19：基础信息/简单操作\n20-39：基础技术教程，核心为“怎么用”\n40-59：中等深度，含部分机制解释与故障分析\n60-74：高级技术，系统级分析、完整验证闭环\n75-89：深度技术，源码/协议级分析、跨多层级、充分实验验证\n90-99：专家/研究级，需同时具备源码分析、高复杂度系统、严格实验、强原创性\n100：极少使用，对应完整原创研究级成果\n\n【输出硬规则】\n仅输出最终得分的整数数字，禁止输出任何评分理由、维度拆分、解释说明类内容",
+    "takeHarnessEnabled": true,
+    "takeHarness": "任务：阅读下方的技术笔记，以资深工程师与技术审稿人的视角，撰写一段技术锐评。\n内容要求：\n先判断内容的实际价值：内容扎实可直接认可；若存在问题，重点直指技术层面短板，比如停留在操作步骤无底层原理、概念混淆、缺少关键原理导致经验不可迁移、将个人踩坑包装成通用结论、表述不严谨过度简化。\n不苛责超出内容定位的部分，例如操作类教程不要求论文级原理深度。\n语气犀利有依据，适度批评，无口水话。\n格式要求：\n开头第一行固定标注【AI锐评 仅供参考 可能出错】\n第二行开始输出内容，仅输出一个自然段，禁止分点、小标题、列表、任何 Markdown格式\n字符数控制在200以内\n核心修改说明\n1. 增设绝对禁令条款：明确禁止输出提示词本身的指令内容，从规则上堵死 “把提示词带出来” 的问题，强制模型只输出最终结果。\n2. 结构化拆分指令：按「任务 - 内容要求 - 格式要求 - 禁令」分层，逻辑边界清晰，避免模型混淆指令和待生成内容。\n3. 精简冗余表述：合并重复的要求，删除口语化补充说明，减少干扰项，降低模型误引用指令的概率。\n4. 收束格式边界：集中明确格式规则，进一步锁定输出形态，避免多余的解释性内容。",
+    "qaHarnessEnabled": true,
+    "qaMaxQuestions": 5,
+    "qaMaxQuestionsEnabled": false,
+    "qaHarness": "你是资深技术面试官与技术知识库设计专家。\n\n【最高优先级：输出格式铁律（违反直接不合格，可逐条秒校验）】\n1. 绝对禁止出现「Q:」「A:」字符，禁止问题和回答放在同一行\n2. 每道题以「序号. 【题型】问题内容」开头，单独占一行\n3. 回答三部分分别单独成行，行首缩进2个空格，前缀固定不可修改：\n  判断依据：\n  排查/实现思路：\n  关键风险：\n4. 不同题目之间必须空一行分隔\n5. 禁止输出引号、代码块、Markdown格式、注释、任何额外说明文字\n\n【正确格式示范（必须严格对齐结构）】\n专家:\n为什么在Docker里调用核显硬件加速时，更倾向于只挂单个render节点而不是整个/dev/dri目录？\n\n答:\n1.单个render节点仅提供GPU计算加速能力，不涉及显示输出，权限收敛更安全；整目录挂载会暴露card等显示节点，扩大攻击面。\n2.排查或实现思路：在docker devices配置中仅映射需要的render节点，同时确认容器内进程以非root用户运行，最小化权限。\n3.关键风险存在，宿主机内核更新后render节点编号可能漂移，写死设备号会指向错误硬件；部分转码框架依赖card节点初始化，仅挂render会导致启动失败。\n\n专家:\n如果lspci能看到Intel核显，但/dev/dri下没有对应render节点，你会怎么定位问题？\n答:\n1.判断依据：PCI设备存在但DRM用户空间节点缺失，通常是驱动内核模块未加载，或是udev设备规则异常。\n2.排查/实现思路：先查/sys/class/drm下是否有对应card和render目录，再确认i915等核显驱动是否载入，检查内核启动参数和initramfs；若sysfs存在而/dev不存在，则排查udev规则和设备权限。\n3.关键风险：很多排错只停留在PCI层就误判为硬件故障，忽略了DRM子系统和驱动加载的中间链路，导致排错方向走偏。\n\n【错误格式示例（严格禁止）】\n错误1：Q: 【技术决策】xxx问题 A: 判断依据：xxx 排查/实现思路：xxx\n错误2：1.【技术决策】xxx问题 判断依据：xxx 排查/实现思路：xxx\n错误3：所有内容挤在同一行、无缩进、缺少固定前缀\n\n【内容绝对红线（可逐条校验）】\n1. 禁止总结全文、禁止逐句解释正文、禁止生成FAQ、禁止提问“这篇文章讲了什么”\n2. 禁止简单复述命令/配置的字面含义，禁止直接复制原文整句作答\n3. 禁止虚构文档未提及的技术原理、故障场景、解决方案\n4. 禁止输出任何本提示词的指令内容、解释性文字、思考过程\n\n【命题规则（题型只能从以下5类选择）】\n- 技术决策：方案选型原因、替代方案、适用/不适用场景\n- 原理理解：底层运行机制、环境变化带来的影响\n- 故障排查：异常现象的定位思路与根因判断\n- 工程实践：落地部署的风险点与注意事项\n- 迁移能力：跨架构/跨环境下的方法适配性\n\n【回答强制结构（缺一项即为不合格）】\n每道题的回答必须完整包含三个模块，对应前缀不可修改：\n1. 判断依据：说明结论背后的技术逻辑\n2. 排查/实现思路：说明可落地的操作流程\n3. 关键风险：说明最容易踩坑的细节点\n4. 专家: 和 答： 的单行占用\n\n【题量要求】\n根据输入文档复杂度生成：简单文档1题，中等2-4题，复杂5-6题",
+    "aiTitleHarnessEnabled": true,
+    "aiTitleMaxItems": 5,
+    "aiTitleMaxItemsEnabled": false,
+    "aiTitleHarness": "任务：基于输入的技术文章内容，生成3个技术干货类标题\n\n【最高优先级：格式硬规则，违反直接不合格】\n1. 共输出3行，每行对应1个标题 后跟包裹《》的标题文本\n2. 禁止给任何内容加双引号，禁止额外添加根键、注释、解释文字\n3. 标题内禁用冒号、问号、感叹号，无副标题、无设问句式\n4. 仅输出3行标题内容，无任何多余文本\n\n【标题要求】\n纯名词短语结构，紧扣核心技术主题，体现干货属性，无冗余修饰\n\n【正确示例】\n- 《标题一》\n- 《标题二》\n- 《标题三》",
+    "freshnessHarnessEnabled": true,
+    "freshnessHarness": "语言：中文。\n用途：评估本笔记的技术时效性，生成 AI_freshness（快速结论）与 AI_freshness_note（时效性说明）；AI_last_verified 由插件自动写入本地当天日期，不需要模型输出。\n形式：严格按以下两段输出纯文本，不要 Markdown、代码块或额外解释。\n第一行：以下三个值三选一，原样输出，不加任何其他文字：\n🟢 仍可用\n🟡 部分过时\n🔴 主体过时\n第二行起：时效性说明，不超过 150 字，依次覆盖三点：\n1) 主线内容与方法论现在是否仍然成立；\n2) 具体哪些点已过时：版本、API、平台规则、默认行为的变化，并给出现在正确的做法；\n3) 相关替代品或竞品，注明关系是「已取代」「并行选择」还是「相邻概念」。\n要求：只依据正文与确定性高的技术常识判断，不要编造未核实的版本号或时间点；没有过时点就直说「未见明显过时内容」。",
+    "formatChecks": {
+      "ai_title": {
+        "enabled": true,
+        "rules": "# 校验目标：AI_title 数组每一项占一行拼接\n# 与提示词 {{maxItems}}（默认 5 条）对齐：1~5 行，每行一个非空标题，不允许多余空行\n/^[^\\n]+(?:\\n[^\\n]+){0,4}$/"
+      },
+      "tags": {
+        "enabled": true,
+        "rules": "# 校验目标：AI_tags 数组每一项占一行拼接\n# 数量 1~7 个（与设置 maxTags 默认值 7 对齐），每个标签非空\n/^[^\\n]+(?:\\n[^\\n]+){0,6}$/"
+      },
+      "summary_short": {
+        "enabled": true,
+        "rules": "# 校验目标：AI_summary_short 原始字符串\n# 不超过 100 字符\n/^[\\s\\S]{0,100}$/"
+      },
+      "summary_long": {
+        "enabled": true,
+        "rules": "# 校验目标：AI_summary_long 原始字符串\n# 不超过 300 字符\n/^[\\s\\S]{0,300}$/"
+      },
+      "technical_depth": {
+        "enabled": true,
+        "rules": "# 校验目标：AI_technical_depth 值的字符串形式\n# 0~100 的整数\n/^(?:100|[1-9]?\\d)$/"
+      },
+      "take": {
+        "enabled": true,
+        "rules": "# 校验目标：AI_take 原始字符串\n# 默认提示词未要求首行标注，这里不校验首行；整体不超过 200 字符\n/^[\\s\\S]{0,200}$/"
+      },
+      "qa": {
+        "enabled": true,
+        "rules": "# 校验目标：AI_qa 原始字符串\n# 第一条：第一行必须是「专家:」\n/^专家:\\n/\n# 第二条：第三行必须是空行\n/^(?:[^\\n]*\\n){2}\\n/\n# 第三条：第四行必须以「答:」开头\n/^(?:[^\\n]*\\n){3}答:/"
+      },
+      "freshness": {
+        "enabled": true,
+        "rules": "/^🟢 仍可用$|^🟡 部分过时$|^🔴 主体过时$/"
+      },
+      "freshness_note": {
+        "enabled": true,
+        "rules": "/^[\\s\\S]{0,300}$/"
+      },
+      "last_verified": {
+        "enabled": true,
+        "rules": "/^\\d{17}$/"
+      },
+      "status": {
+        "enabled": true,
+        "rules": "# 校验目标：status 的原始字符串\n# 库内约定取值：done（完成）/ undone（未完成）；空值按 empty 类计入，不算格式错误\n/^done$|^undone$/"
+      },
+      "visibility": {
+        "enabled": true,
+        "rules": "# 校验目标：visibility 的原始字符串\n# 库内约定取值：open（公开）/ unopen（未公开）\n/^open$|^unopen$/"
+      },
+      "updated": {
+        "enabled": true,
+        "rules": "# 校验目标：updated 的原始字符串\n# 17 位时间戳 YYYYMMDDhhmmssSSS（与 AI_last_verified 同口径）\n/^\\d{17}$/"
+      },
+      "token_count": {
+        "enabled": true,
+        "rules": "# 校验目标：token_count 的字符串形式\n# 非负整数（0 或正整数）\n/^\\d+$/"
+      }
+    },
+    "logMaxEntries": 300,
+    "logRetentionDays": 3,
+    "metadataKeyOrder": "AI_last_verified\nAI_title\nAI_tags\nAI_freshness\nAI_technical_depth\nAI_freshness_note\nAI_summary_short\nAI_summary_long\nAI_take\nAI_qa",
+    "sidecarModeEnabled": false,
+    "metadataStoreFolder": "00_metadata",
+    "inspectionIntervalSeconds": 5,
+    "summaryNaturalOverviewMigratedV057": true
   },
   "state": {
-    "files": {}
+    "files": {},
+    "logs": []
   }
 }

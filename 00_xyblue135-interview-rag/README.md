@@ -74,6 +74,23 @@ AI 精答（用召回笔记作资料组织答案）
   `aiContextCharsPerDoc`、`aiAssist`、`aiFallbackLocal`、`aiSystemPrompt`
 - **直答**：`spokenEnabled` 及配套提示词
 
+## 配置与密钥
+
+配置存在插件目录的 `data.json`，**不进 git** —— 里面是明文 API Key。
+仓库里只放模板 `data.example.json`，第一次用照抄一份即可：
+
+```bash
+cd .obsidian/plugins/00_xyblue135-interview-rag
+cp data.example.json data.json
+# 然后编辑 data.json，把下面这些字段填上
+```
+
+本插件需要填的凭证字段：`apiKey`（AI 组织回答用；不填则退化为纯本地召回）
+
+> ⚠️ 填好 key 的 `data.json` 永远不要提交。
+> 提交前在 `.obsidian` 目录跑 `node tools/check-secrets.js`，
+> 扫到疑似密钥会返回非 0 并列出位置。
+
 ## 注意
 
 - 默认 `ragDir` 是 **`D:\obs-interview\rag`**（Windows 绝对路径），**首次使用必须改成你自己的目录**。

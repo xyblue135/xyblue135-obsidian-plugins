@@ -67,6 +67,23 @@
 > 因为上面两个插件直接读 `data.json`，改动本插件 `data.json` 的**字段名**会让它们失效。
 > 改结构时要同步检查 `docs-nav` 与 `job-lens`。
 
+## 配置与密钥
+
+配置存在插件目录的 `data.json`，**不进 git** —— 里面是明文 API Key。
+仓库里只放模板 `data.example.json`，第一次用照抄一份即可：
+
+```bash
+cd .obsidian/plugins/00_xyblue135-skill-miner
+cp data.example.json data.json
+# 然后编辑 data.json，把下面这些字段填上
+```
+
+本插件需要填的凭证字段：`settings.apiKey`（主用）、`settings.searchApiKey`（可选，联网搜索用）
+
+> ⚠️ 填好 key 的 `data.json` 永远不要提交。
+> 提交前在 `.obsidian` 目录跑 `node tools/check-secrets.js`，
+> 扫到疑似密钥会返回非 0 并列出位置。
+
 ## 注意
 
 - `data.json` 较大（约 118 KB），里面除了设置还有技能矩阵缓存（`refined` / `pulse` 等），

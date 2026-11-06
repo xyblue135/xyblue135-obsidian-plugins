@@ -1,0 +1,12 @@
+{
+  "notesRoot": "my_blog/00_docs",
+  "assetsRoot": "my_blog/00_assets",
+  "aiEnabled": true,
+  "aiBaseUrl": "http://127.0.0.1:31415/v1",
+  "aiApiKey": "",
+  "aiModel": "auto",
+  "requestTimeoutSeconds": 90,
+  "maxSuggestions": 3,
+  "profileTagLimit": 6,
+  "profileTitleLimit": 2
+}

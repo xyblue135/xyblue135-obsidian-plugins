@@ -58,6 +58,23 @@
 
 > 设置里的提示词（harness）都可以直接编辑，改完立刻生效，不用改代码。
 
+## 配置与密钥
+
+配置存在插件目录的 `data.json`，**不进 git** —— 里面是明文 API Key。
+仓库里只放模板 `data.example.json`，第一次用照抄一份即可：
+
+```bash
+cd .obsidian/plugins/00_xyblue135-metadata-ai
+cp data.example.json data.json
+# 然后编辑 data.json，把下面这些字段填上
+```
+
+本插件需要填的凭证字段：`settings.apiKey`（嵌在 `settings` 对象里）
+
+> ⚠️ 填好 key 的 `data.json` 永远不要提交。
+> 提交前在 `.obsidian` 目录跑 `node tools/check-secrets.js`，
+> 扫到疑似密钥会返回非 0 并列出位置。
+
 ## 注意
 
 - 只对 `whitelistFolder` 下的笔记生效，其他位置不接管。

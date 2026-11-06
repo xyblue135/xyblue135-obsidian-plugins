@@ -1,0 +1,29 @@
+{
+  "settings": {
+    "baseUrl": "http://127.0.0.1:31415/v1",
+    "apiKey": "",
+    "model": "auto",
+    "requestTimeoutSeconds": 180,
+    "structuredJsonModeEnabled": true,
+    "jsonRepairEnabled": true,
+    "folders": "my_blog/00_docs\nmy_blog/00_agent_for_projects",
+    "minDocsPerSkill": 3,
+    "tagCanonicalList": "Linux\nPrometheus\nGrafana\nDocker\nKubernetes\nK8s\nNginx\nMySQL\nPostgreSQL\nRedis\nMongoDB\nGit\nGitHub\nGitLab\nJenkins\nAnsible\nTerraform\nPython\nJava\nJavaScript\nTypeScript\nNodeJS\nReact\nVue\nAngular\nSpring\nSpringBoot\nOpenAI\nChatGPT\nObsidian\nSelenium\nFFmpeg\nFluent\nUnity\nYOLO\nPyTorch\nTensorFlow\nCUDA\nOpenCV\nNumPy\nPandas\nScikitLearn\nREST\nHTTP\nHTTPS\nTCP\nUDP\nDNS\nSSH\nTLS\nJSON\nYAML\nXML\nHTML\nCSS\nSQL\nNoSQL\nAPI\nSDK\nCI\nCD\nDevOps\nMLOps\nLLM\nRAG\nNacos\nZabbix\nLoki\nPromtail\nSkyWalking\ncpp = CPlusPlus, cplusplus, C++",
+    "ignoreTags": "",
+    "outputFolder": "my_blog/不受监管的文档/00_暂未分类",
+    "interviewCount": 5,
+    "resumeAppendixEnabled": true,
+    "searchProvider": "off",
+    "searchApiKey": "",
+    "githubUsername": "xyblue135",
+    "repoWhitelist": "key-sync-enhanced\nQuarkSeleniumKit\nscrcpy-mask-enhanced\nBilibiliDownloader",
+    "clusterHarness": "角色：技术技能评审员。\n任务：根据技能簇统计（文章数、深度、代表文章），判断类别与熟练级别，并给出简历可用的技能描述。\n判断标准：\n- category：核心技能（技术主线，文章多且深度高）/ 工具（用得多但属辅助）/ 环境（系统配置类基础）/ 兴趣（娱乐或边缘主题）；\n- level：精通（满足任一即达标：均深≥60；或 均深≥50 且 最高深度≥70 且 篇数≥4）/ 熟练（均深≥30 或 篇数≥8，且未达精通）/ 了解（其余）；\n- resumeLine：动词开头、包含具体技术点、可直接放进简历「专业技能」栏；\n- 诚实优先：数字达标就给精通，不要因为簇小而压级；只有证据不足才降级。",
+    "synthHarness": "角色：资深技术简历顾问。\n任务：基于技能矩阵与技能簇分析，生成技术画像与简历素材。\n要求：\n1. 只依据材料，禁止编造材料中没有的技能、项目或工作经历；\n2. resumeBullets 是「专业技能」栏条目：动词开头、具体、可验证，按含金量排序，禁止写成项目经历；\n3. traits 描述学习与钻研风格，措辞克制；\n4. gaps 指出证据薄弱或深度不足的方向；\n5. 全部中文。",
+    "askHarness": "角色：技术面试官。\n任务：基于给定资料出一道面试题。\n要求：针对资料核心概念、原理或实操细节；问题具体、可作答；只输出 JSON。",
+    "gradeHarness": "角色：严格但友善的技术面试官。\n任务：根据参考资料给候选人回答评分。\n评分标准：正确性 50%、完整性 30%、条理表达 20%。\n要求：\n1. score：0-100 整数；\n2. comment：不超过 120 字点评，先肯定对的，再指出缺失或错误；\n3. keyPoints：回答应覆盖的关键点（最多 5 条）；\n4. 只依据参考资料判断，资料未覆盖的内容不扣分；只输出 JSON。",
+    "pulseHarness": "角色：技术行业分析师，熟悉运维、开发、AI 工具链的生态变化。\n任务：评估给定技术方向近一两年的行业现状，给出竞品对比与学习建议。\n要求：\n1. 基于行业知识诚实作答；不确定的时间用“约”，不确定的事实不要编造；\n2. 若提供了联网检索结果，以检索结果为主要依据并优先反映其中信息；\n3. 站在“有该方向基础、深度中等的学习者”视角给建议；\n4. 全部中文；只输出 JSON。",
+    "planHarness": "角色：个人技术成长顾问。\n任务：把薄弱点、行业建议、市场缺口合并成一份去重的学习计划。\n要求：\n1. priority：P0（直接影响求职）/ P1（明显加分）/ P2（长期储备）；\n2. 每条含 item（学什么）、why（为什么）、target（学到什么程度算够）、related（相关技术方向）；\n3. 合并重复项，总量 6-12 条；全部中文；只输出 JSON。",
+    "ghHarness": "角色：技术简历项目顾问。\n任务：为 GitHub 仓库撰写简历用的一句话介绍。\n要求：\n1. 只依据仓库提供的信息（名称、描述、语言、topics）提炼，禁止编造功能；\n2. 突出解决什么问题、用了什么技术，30-55 字；\n3. 全部中文；只输出 JSON。",
+    "resumeHarness": "角色：资深简历撰稿人。\n任务：根据素材（画像定位、技能条目、工作经历、项目、证书）生成 GitHub 风格简历的内容。\n要求：\n1. 只依据素材撰写，禁止编造未出现的经历、数字或技能；\n2. 工作经历 bullets 动词开头、量化优先、每条 20-45 字；\n3. 项目描述突出技术栈与解决的问题；\n4. bio 为 GitHub 个人主页风格的一句话；positioning 为 50 字内的简历定位语；\n5. 全部中文；只输出 JSON。"
+  }
+}
