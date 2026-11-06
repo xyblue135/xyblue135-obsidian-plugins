@@ -89,6 +89,9 @@ answer.json = {"id": <同 id>, "answer": "...", "sources": [{"path", "title"}]}
 
 ## 设置
 
+设置页分两段：**主检索**默认展开，**面试问答**默认折叠（右上角「↓ 面试问答设置」可一键跳转并展开）。
+折叠不是为了藏参数，是因为两段加起来 50+ 项，改 API / 白名单不该先滚过整个面试参数。
+
 **接口**（两个模式共用）：`baseUrl`（默认 `http://127.0.0.1:31415/v1`）、`apiKey`、`requestTimeoutSeconds`、
 `structuredJsonModeEnabled`、`jsonRepairEnabled`
 
@@ -112,6 +115,7 @@ answer.json = {"id": <同 id>, "answer": "...", "sources": [{"path", "title"}]}
 **面试 · AI 与直答**：`ivAiEnabled`、`ivModel`、`ivTimeoutMs`、`ivMaxTokens`、`ivContextDocs`、
 `ivContextCharsPerDoc`、`ivAiAssist`、`ivAiFallbackLocal`、`ivAiSystemPrompt`、`ivSpokenEnabled`、
 `ivSpokenSystemPrompt`、`ivSpokenPromptPresets`
+
 
 > `ivModel` 单独填的理由：面试要 3~5 秒出话，主检索可以慢慢精排。实测
 > `cndeepseek-v4-flash` 平均 5.2s、内容最完整；`cnminimax-m3` 4.7s 偏短；`cnhy3` 4.4s 最省字但偏浅；

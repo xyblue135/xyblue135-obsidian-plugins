@@ -14,17 +14,21 @@ const obsidian_1 = require("obsidian");
 const HUB_LABEL = "打开启动台";
 const SELF_ID = "00_xyblue135-launcher";
 
-/* 自研插件注册表：icon=lucide 图标, group=分区, open=主入口命令id, openLabel=主按钮文案
-   2026-11 合并后共 14 项：岗位透镜→技能提炼、元数据补全→AI 元数据、面试检索→AI 检索，
-   名称里带上原插件名，方便按老记忆找到入口。 */
+/* 自研插件注册表：icon=lucide 图标, group=分区, open=入口命令id, openLabel=入口文案
+   2026-11 合并后：岗位透镜→技能提炼、元数据补全→AI 元数据、面试检索→AI 检索。
+   合并进来的子功能**单独占一张卡**（同一个 id 可以出现多次），这样按老名字
+   「面试问答」「岗位透镜」「模板补全」直接搜得到，不用先想起它被并进了谁。 */
 const PLUGIN_REGISTRY = [
-    { name: "AI 检索 / 面试问答", id: "00_xyblue135-ai-search", icon: "search", group: "AI 学习·面试", openLabel: "打开检索", open: "00_xyblue135-ai-search:open-ai-search" },
-    { name: "AI 元数据 / 模板补全", id: "00_xyblue135-metadata-ai", icon: "tags", group: "AI 学习·面试", openLabel: "待更新面板", open: "00_xyblue135-metadata-ai:open-pending-notes-dashboard" },
+    { name: "AI 检索", id: "00_xyblue135-ai-search", icon: "search", group: "AI 学习·面试", openLabel: "打开检索", open: "00_xyblue135-ai-search:open-ai-search" },
+    { name: "面试问答控制台", id: "00_xyblue135-ai-search", icon: "graduation-cap", group: "AI 学习·面试", openLabel: "打开控制台", open: "00_xyblue135-ai-search:iv-open-console" },
+    { name: "AI 元数据", id: "00_xyblue135-metadata-ai", icon: "tags", group: "AI 学习·面试", openLabel: "待更新面板", open: "00_xyblue135-metadata-ai:open-pending-notes-dashboard" },
     { name: "视频分诊", id: "00_xyblue135-video-triage", icon: "monitor-play", group: "AI 学习·面试", openLabel: "打开面板", open: "00_xyblue135-video-triage:open" },
     { name: "待完成工作台", id: "00_xyblue135-undone-workbench", icon: "list-todo", group: "AI 学习·面试", openLabel: "打开工作台", open: "00_xyblue135-undone-workbench:open" },
     { name: "归档推荐", id: "00_xyblue135-docs-archiver", icon: "archive", group: "AI 学习·面试", openLabel: "归档当前笔记", open: "00_xyblue135-docs-archiver:archive-current-note" },
     { name: "知识库导航图", id: "00_xyblue135-docs-nav", icon: "git-fork", group: "AI 学习·面试", openLabel: "打开导航图", open: "00_xyblue135-docs-nav:open" },
-    { name: "技能提炼 / 岗位透镜", id: "00_xyblue135-skill-miner", icon: "briefcase", group: "AI 学习·面试", openLabel: "打开面板", open: "00_xyblue135-skill-miner:open-skill-miner" },
+    { name: "技能提炼", id: "00_xyblue135-skill-miner", icon: "briefcase", group: "AI 学习·面试", openLabel: "打开面板", open: "00_xyblue135-skill-miner:open-skill-miner" },
+    { name: "岗位透镜", id: "00_xyblue135-skill-miner", icon: "compass", group: "AI 学习·面试", openLabel: "打开面板", open: "00_xyblue135-skill-miner:job-lens-open" },
+    { name: "模板补全", id: "00_xyblue135-metadata-ai", icon: "clipboard-check", group: "工具", openLabel: "批量审查", open: "00_xyblue135-metadata-ai:template-audit-whitelist-notes" },
     { name: "Token 统计", id: "00_xyblue135-char-count-updater", icon: "hash", group: "工具", openLabel: null, open: null },
     { name: "附件镜像", id: "00_xyblue135-mirror", icon: "images", group: "工具", openLabel: "检查重名", open: "00_xyblue135-mirror:check-duplicate-notes" },
     { name: "文件 Logo", id: "00_xyblue135-docs-logo", icon: "sticker", group: "工具", openLabel: "重载白名单", open: "00_xyblue135-docs-logo:reload-whitelist-and-icons" },
@@ -87,30 +91,49 @@ class LauncherModal extends obsidian_1.Modal {
     }
 
     collectItems() {
-        const regById = {};
-        for (const item of PLUGIN_REGISTRY) regById[item.id] = item;
         const manifests = (this.app.plugins && this.app.plugins.manifests) || {};
         const enabled = (this.app.plugins && this.app.plugins.enabledPlugins) || new Set();
         /* enabledPlugins 是 Set：Object.keys 会拿到空数组，必须用 has() 判断 */
         const isEnabled = (id) => (typeof enabled.has === "function") ? enabled.has(id) : !!enabled[id];
         const items = [];
+        const covered = new Set();
+
+        /* 1) 先按注册表顺序出条目。同一 id 可以有多条（主入口 + 合并进来的子入口），
+              这样「面试问答」「岗位透镜」「模板补全」都能单独搜到。 */
+        for (const reg of PLUGIN_REGISTRY) {
+            const mf = manifests[reg.id];
+            if (!mf || !isEnabled(reg.id)) continue;
+            covered.add(reg.id);
+            items.push({
+                id: reg.id,
+                name: reg.name,
+                version: mf.version || "",
+                icon: reg.icon || "puzzle",
+                open: reg.open || null,
+                openLabel: reg.openLabel || "设置",
+                group: reg.group || "其他插件",
+                search: (reg.name + " " + mf.name + " " + reg.id + " " + reg.group).toLowerCase(),
+            });
+        }
+
+        /* 2) 注册表没写但已启用的插件，按 manifest 原名兜底 */
         for (const id of Object.keys(manifests)) {
-            if (id === SELF_ID) continue;
+            if (id === SELF_ID || covered.has(id)) continue;
             if (!isEnabled(id)) continue;
             const mf = manifests[id];
             if (!mf) continue;
-            const reg = regById[id];
             items.push({
                 id: id,
-                name: cleanName(mf.name),
+                name: this.cleanName(mf.name),
                 version: mf.version || "",
-                icon: reg ? reg.icon : "puzzle",
-                open: reg ? reg.open : null,
-                openLabel: reg ? reg.openLabel : "设置",
-                group: reg ? reg.group : "其他插件",
-                search: (mf.name + " " + id + " " + (reg ? reg.group : "其他")).toLowerCase(),
+                icon: "puzzle",
+                open: null,
+                openLabel: "设置",
+                group: "其他插件",
+                search: (mf.name + " " + id + " 其他插件").toLowerCase(),
             });
         }
+
         if (!items.length) {
             /* 永远不再出现"神秘空白"：数据异常时给出明确提示 */
             items.push({ id: "__empty__", name: "未发现已启用的插件", version: "", icon: "info", open: null, openLabel: null, group: "其他插件", search: "" });

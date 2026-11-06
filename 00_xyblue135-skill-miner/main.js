@@ -3124,7 +3124,8 @@ class SkillMinerPlugin extends Plugin {
     this.client = new AIClient(this);
     this.matrix = null;
 
-    this.addRibbonIcon('briefcase', '技能提炼', () => this.openPanel());
+    this.addRibbonIcon('briefcase', '技能提炼', () => this.openPanel())
+      .addClass('xyblue135-ribbon xyblue135-ai');
     this.addCommand({ id: 'open-skill-miner', name: '打开技能提炼', callback: () => this.openPanel() });
     this.addCommand({ id: 'rebuild-skill-matrix', name: '重建技能矩阵', callback: () => this.rebuildMatrix(false) });
     this.addCommand({ id: 'start-interview', name: '开始模拟面试', callback: () => new InterviewModal(this).open() });

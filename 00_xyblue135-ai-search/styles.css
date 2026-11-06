@@ -268,3 +268,109 @@
   color: var(--text-muted);
   font-size: 12px;
 }
+
+/* ==================== 设置页：导航 + 面试段折叠（1.0.1） ==================== */
+/* 两段设置合计 50+ 项，默认只展开主检索；面试参数点开才看 */
+.xyas-nav {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.xyas-nav-btn {
+  padding: 4px 10px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  background: var(--background-modifier-hover);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.xyas-nav-btn:hover {
+  color: var(--text-normal);
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+
+details.xyas-iv-section {
+  margin-top: 22px;
+  padding-top: 6px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+details.xyas-iv-section > summary.xyas-iv-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 4px 8px 22px;
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+  border-radius: var(--radius-s);
+}
+
+details.xyas-iv-section > summary.xyas-iv-summary::-webkit-details-marker {
+  display: none;
+}
+
+details.xyas-iv-section > summary.xyas-iv-summary::before {
+  content: '▸';
+  position: absolute;
+  left: 4px;
+  top: 9px;
+  color: var(--text-faint);
+  transition: transform 0.12s ease;
+}
+
+details.xyas-iv-section[open] > summary.xyas-iv-summary::before {
+  transform: rotate(90deg);
+}
+
+details.xyas-iv-section > summary.xyas-iv-summary:hover {
+  background: var(--background-modifier-hover);
+}
+
+.xyas-iv-title {
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+  color: var(--text-normal);
+}
+
+.xyas-iv-hint {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
+details.xyas-iv-section[open] > summary.xyas-iv-summary {
+  margin-bottom: 6px;
+}
+
+.xyas-iv-body {
+  padding-left: 4px;
+}
+
+/* 段内 h4 当小标题用，别再叠一层大字号 */
+.xyas-iv-body > h4 {
+  margin: 18px 0 4px;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.xyas-iv-body > h4:first-child {
+  margin-top: 4px;
+}
+
+.xyas-iv-note {
+  margin: 2px 0 12px;
+  padding: 8px 10px;
+  font-size: var(--font-ui-smaller);
+  line-height: 1.6;
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  border-left: 3px solid var(--interactive-accent);
+  border-radius: var(--radius-s);
+}

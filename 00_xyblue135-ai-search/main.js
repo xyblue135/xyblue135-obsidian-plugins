@@ -1956,6 +1956,16 @@ class AISearchSettingTab extends PluginSettingTab {
     const { contentEl } = this;
     contentEl.empty();
     const s = this.plugin.settings;
+    let ivDetails = null;   // 面试段折叠容器，在下方创建；导航按钮靠它跳转
+
+    /* 两段设置加起来 50+ 项，给个跳转，省得靠滚轮找 */
+    const navBar = contentEl.createDiv('xyas-nav');
+    const jumpBtn = navBar.createEl('button', { text: '↓ 面试问答设置', cls: 'xyas-nav-btn' });
+    jumpBtn.onclick = () => {
+      if (!ivDetails) return;
+      ivDetails.open = true;
+      ivDetails.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
 
     new Setting(contentEl).setName('API 接口').setHeading();
     new Setting(contentEl)
@@ -2098,13 +2108,24 @@ class AISearchSettingTab extends PluginSettingTab {
         new Notice('AI 检索：索引缓存已清除');
       }));
 
-    /* ==================== 面试模式（1.0.0 由 interview-rag 并入） ==================== */
+    /* ==================== 面试模式（1.0.0 由 interview-rag 并入） ====================
+       这一段本身有 6 组 36 项。默认折叠，否则改「API / 白名单」得先滚过整个面试参数。 */
+    ivDetails = contentEl.createEl('details', { cls: 'xyas-iv-section' });
+    const ivSummary = ivDetails.createEl('summary', { cls: 'xyas-iv-summary' });
+    ivSummary.createEl('span', { text: '面试问答设置', cls: 'xyas-iv-title' });
+    ivSummary.createEl('span', {
+      text: '桥接 · 召回权重 · 直答 · 模型（共用上方的 baseUrl / apiKey）',
+      cls: 'xyas-iv-hint',
+    });
+    const ivEl = ivDetails.createEl('div', { cls: 'xyas-iv-body' });
 
-    new Setting(contentEl).setName('面试问答 · 监听与桥接').setHeading();
-    new Setting(contentEl)
-      .setDesc('面试问答与上面的 AI 检索共用同一份索引、同一个 baseUrl / apiKey（只填一次），'
-        + '但模型、超时、评分权重各自独立——面试要「毫秒级 + 字面准」，与日常检索取舍不同。');
-    new Setting(contentEl)
+    ivEl.createEl('h4', { text: '监听与桥接' });
+    ivEl.createEl('p', {
+      cls: 'xyas-iv-note',
+      text: '面试问答与上面的 AI 检索共用同一份索引、同一个 baseUrl / apiKey（只填一次），'
+        + '但模型、超时、评分权重各自独立——面试要「毫秒级 + 字面准」，与日常检索取舍不同。',
+    });
+    new Setting(ivEl)
       .setName('启用 ragfile 监听')
       .setDesc('监听 rag 目录的 query.json 并写 answer.json 应答 bridge')
       .addToggle((t) => t.setValue(s.ivBridgeEnabled).onChange(async (v) => {
@@ -2113,102 +2134,102 @@ class AISearchSettingTab extends PluginSettingTab {
         if (v) this.plugin.bridge.start(); else this.plugin.bridge.stop();
         this.plugin.refreshStatusBar();
       }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('rag 目录')
       .setDesc('bridge 写 query.json / 读 answer.json 的目录（与 bridge_config.json 的 rag.dir 一致）')
       .addText((t) => t.setValue(s.ivRagDir).onChange(async (v) => { s.ivRagDir = v.trim(); await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('轮询间隔（毫秒）')
       .setDesc('轮询 query.json 的间隔；fs.watch 同时在跑，这只是兜底。300ms 约等于最坏 0.3s 延迟')
       .addText((t) => t.setValue(String(s.ivPollMs)).onChange(async (v) => {
         const n = Number(v);
         if (Number.isFinite(n) && n >= 100) { s.ivPollMs = Math.round(n); await this.plugin.saveSettings(); }
       }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('应答兜底时限（毫秒）')
       .setDesc('从读到请求到必须写应答的硬时限，超时回错误应答。bridge 超时 15s，建议 ≤10000')
       .addText((t) => t.setValue(String(s.ivAnswerDeadlineMs)).onChange(async (v) => {
         const n = Number(v);
         if (Number.isFinite(n) && n >= 2000) { s.ivAnswerDeadlineMs = Math.round(n); await this.plugin.saveSettings(); }
       }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('打开面试控制台')
       .setDesc('模拟面试官提问，走和 bridge 完全相同的管线（召回 → 组装 → 来源），不用真开面试')
       .addButton((b) => b.setButtonText('打开').onClick(() => this.plugin.ivOpenConsole()));
 
-    new Setting(contentEl).setName('面试问答 · 召回与权重').setHeading();
-    new Setting(contentEl)
+    new Setting(ivEl).setName('召回与权重').setHeading();
+    new Setting(ivEl)
       .setName('召回候选上限')
       .setDesc('评分后保留的候选数；回答只取前「来源条数」条')
       .addSlider((t) => t.setLimits(10, 100, 5).setValue(s.ivRecallLimit).setDynamicTooltip()
         .onChange(async (v) => { s.ivRecallLimit = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('来源条数')
       .setDesc('回答要点条数 / answer.json 里 sources 的条数（bridge 取前 5 条显示）')
       .addSlider((t) => t.setLimits(1, 8, 1).setValue(s.ivMaxSources).setDynamicTooltip()
         .onChange(async (v) => { s.ivMaxSources = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('最低分数门槛')
       .setDesc('低于该分的候选视为不相关直接丢弃（0 = 不过滤）；调大可减少答非所问')
       .addSlider((t) => t.setLimits(0, 60, 2).setValue(s.ivMinScore).setDynamicTooltip()
         .onChange(async (v) => { s.ivMinScore = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('强文本权重（标题/标签/摘要）')
       .setDesc('命中标题、标签、AI 摘要时的每词权重；面试场景建议 4-10')
       .addSlider((t) => t.setLimits(0, 15, 1).setValue(s.ivWStrong).setDynamicTooltip()
         .onChange(async (v) => { s.ivWStrong = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('正文权重')
       .setDesc('命中正文时的每词权重；过大容易让长文霸榜，建议 1-3')
       .addSlider((t) => t.setLimits(0, 6, 1).setValue(s.ivWBody).setDynamicTooltip()
         .onChange(async (v) => { s.ivWBody = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('整句命中加分（强文本）')
       .setDesc('问题整句出现在标题/摘要区的额外加分')
       .addSlider((t) => t.setLimits(0, 60, 5).setValue(s.ivPhraseBonusStrong).setDynamicTooltip()
         .onChange(async (v) => { s.ivPhraseBonusStrong = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('整句命中加分（正文）')
       .setDesc('问题整句出现在正文时的额外加分')
       .addSlider((t) => t.setLimits(0, 40, 2).setValue(s.ivPhraseBonusBody).setDynamicTooltip()
         .onChange(async (v) => { s.ivPhraseBonusBody = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('热词加分')
       .setDesc('每命中一个热词给整篇笔记加的分（热词=当前面试领域词，抬高相关笔记）')
       .addSlider((t) => t.setLimits(0, 30, 1).setValue(s.ivHotwordBoost).setDynamicTooltip()
         .onChange(async (v) => { s.ivHotwordBoost = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('热词文件路径')
       .setDesc('与 bridge 共用的 hotwords.txt；# 开头为注释，改动即时生效')
       .addText((t) => t.setValue(s.ivHotwordsFile).onChange(async (v) => { s.ivHotwordsFile = v.trim(); await this.plugin.saveSettings(); }));
 
-    new Setting(contentEl).setName('面试问答 · 回答组装（本地要点）').setHeading();
-    new Setting(contentEl)
+    new Setting(ivEl).setName('回答组装（本地要点）').setHeading();
+    new Setting(ivEl)
       .setName('摘要半径（字符）')
       .setDesc('每条要点围绕首个命中词前后各取多少字符；60 ≈ 每条 120 字')
       .addSlider((t) => t.setLimits(30, 150, 10).setValue(s.ivSnippetRadius).setDynamicTooltip()
         .onChange(async (v) => { s.ivSnippetRadius = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('回答前缀')
       .setDesc('回答首行前缀，留空则不加（悬浮卡上靠它区分检索结果和转写原文）')
       .addText((t) => t.setValue(s.ivAnswerTitle).onChange(async (v) => { s.ivAnswerTitle = v.trim(); await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('回答总长上限（字符）')
       .setDesc('超出截断；悬浮卡 520px 宽，建议 400-800')
       .addSlider((t) => t.setLimits(200, 1500, 50).setValue(s.ivMaxAnswerChars).setDynamicTooltip()
         .onChange(async (v) => { s.ivMaxAnswerChars = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('要点里附笔记路径')
       .setDesc('打开后每条要点下多一行路径（来源列表本来就单独传给 bridge）')
       .addToggle((t) => t.setValue(s.ivShowSourcePaths).onChange(async (v) => { s.ivShowSourcePaths = v; await this.plugin.saveSettings(); }));
 
-    new Setting(contentEl).setName('面试问答 · 问题清洗').setHeading();
-    new Setting(contentEl)
+    new Setting(ivEl).setName('问题清洗').setHeading();
+    new Setting(ivEl)
       .setName('最短问题字数')
       .setDesc('去空白后短于该字数的请求直接回错误应答（挡住转写碎片）')
       .addSlider((t) => t.setLimits(0, 12, 1).setValue(s.ivMinQuestionChars).setDynamicTooltip()
         .onChange(async (v) => { s.ivMinQuestionChars = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('噪声正则（每行一个）')
       .setDesc('命中的问题视为转写幻觉/噪声，回错误应答。例：^by bwd6$|^啊哈$|^叻+$')
       .addTextArea((t) => {
@@ -2217,15 +2238,15 @@ class AISearchSettingTab extends PluginSettingTab {
         t.setValue(s.ivNoiseRegex).onChange(async (v) => { s.ivNoiseRegex = v; await this.plugin.saveSettings(); });
       });
 
-    new Setting(contentEl).setName('面试问答 · 直答模式（代替我回答）').setHeading();
-    new Setting(contentEl)
+    new Setting(ivEl).setName('直答模式（代替我回答）').setHeading();
+    new Setting(ivEl)
       .setName('启用直答模式')
       .setDesc('开启后 AI 以第一人称口语代替你回答面试官，悬浮卡上直接是能照着说的话；'
         + '需要网关在线，失败自动退回「AI 精答 → 本地要点」，不会拖慢应答')
       .addToggle((t) => t.setValue(s.ivSpokenEnabled).onChange(async (v) => {
         s.ivSpokenEnabled = v; await this.plugin.saveSettings(); this.plugin.refreshStatusBar();
       }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('直答提示词')
       .setDesc('控制「像人说话」的程度：长短、口头语、是否坦承不熟的部分都在这里调'
         + (s.ivSpokenPromptPresets ? '；已注册风格命令：' + Object.keys(s.ivSpokenPromptPresets).join(' / ') : ''))
@@ -2237,47 +2258,47 @@ class AISearchSettingTab extends PluginSettingTab {
       .addExtraButton((b) => b.setIcon('rotate-ccw').setTooltip('恢复默认')
         .onClick(async () => { s.ivSpokenSystemPrompt = DEFAULT_IV_SPOKEN_PROMPT; await this.plugin.saveSettings(); this.display(); }));
 
-    new Setting(contentEl).setName('面试问答 · AI 精答').setHeading();
-    new Setting(contentEl)
+    new Setting(ivEl).setName('AI 精答').setHeading();
+    new Setting(ivEl)
       .setName('启用 AI 精答')
       .setDesc('网关在线时用 AI 把召回资料组织成口头回答；不在线自动降级本地要点，不影响应答速度')
       .addToggle((t) => t.setValue(s.ivAiEnabled).onChange(async (v) => { s.ivAiEnabled = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('AI 协助（资料弱相关时用通用经验补齐）')
       .setDesc('打开：召回资料只当参考，资料与问题无关就忽略、改由 AI 用通用工程经验作答并标注；'
         + '关闭：严格只用资料，资料不足时只回「资料中未找到」')
       .addToggle((t) => t.setValue(s.ivAiAssist).onChange(async (v) => { s.ivAiAssist = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('面试用模型')
       .setDesc('与上面主检索的模型分开填：面试要快、要短。实测 cndeepseek-v4-flash 平均 5.2s、内容最完整；'
         + 'cnminimax-m3 4.7s 偏短；cnhy3 4.4s 最省字但偏浅；cnglm-5.3-flash 与 cnkimi-k2.8-preview 8s 以上别用')
       .addText((t) => t.setValue(s.ivModel).onChange(async (v) => { s.ivModel = v.trim(); await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('AI 超时（毫秒）')
       .setDesc('必须小于应答兜底时限，否则超时的 AI 回答来不及上卡；到点自动降级本地要点')
       .addText((t) => t.setValue(String(s.ivTimeoutMs)).onChange(async (v) => {
         const n = Number(v);
         if (Number.isFinite(n) && n >= 1000) { s.ivTimeoutMs = Math.round(n); await this.plugin.saveSettings(); }
       }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('输出上限（token，0=不限）')
       .setDesc('⚠️ 一般留 0。网关不流式返回，把它调小并不会让答案变快，反而会让部分模型把思考过程当正文吐出来、答案断在半句（实测 deepseek 系必现）。要提速就换模型')
       .addSlider((t) => t.setLimits(0, 1200, 40).setValue(s.ivMaxTokens).setDynamicTooltip()
         .onChange(async (v) => { s.ivMaxTokens = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('AI 资料条数')
       .setDesc('喂给 AI 的笔记条数（实测 3 条与 5 条延迟无差别，砍它只丢引用不省时间）')
       .addSlider((t) => t.setLimits(3, 10, 1).setValue(s.ivContextDocs).setDynamicTooltip()
         .onChange(async (v) => { s.ivContextDocs = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('单篇资料字符上限')
       .addSlider((t) => t.setLimits(500, 3000, 100).setValue(s.ivContextCharsPerDoc).setDynamicTooltip()
         .onChange(async (v) => { s.ivContextCharsPerDoc = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('AI 失败降级本地要点')
       .setDesc('关闭后 AI 失败直接回错误应答（卡片显示失败原因）')
       .addToggle((t) => t.setValue(s.ivAiFallbackLocal).onChange(async (v) => { s.ivAiFallbackLocal = v; await this.plugin.saveSettings(); }));
-    new Setting(contentEl)
+    new Setting(ivEl)
       .setName('AI 精答提示词')
       .setDesc('「AI 协助」打开时会在这段提示词后面自动追加一段「资料弱相关怎么办」的补充规则')
       .addTextArea((t) => {
@@ -2308,18 +2329,18 @@ class AISearchPlugin extends Plugin {
     this.statusBarEl.onclick = () => this.openSearch();
     this.refreshStatusBar();
 
-    this.addRibbonIcon('search', 'AI 检索', () => this.openSearch());
+    // 品牌分组标记（见 snippets/xyblue135-brand.css）
+    // 用 addRibbonIcon 的返回值直接打类：比 querySelector 按 aria-label 二次查找可靠
+    // （那边一旦改了图标文案就静默失效）。
+    this.addRibbonIcon('search', 'AI 检索', () => this.openSearch())
+      .addClass('xyblue135-ribbon xyblue135-ai');
     this.addCommand({
       id: 'open-ai-search',
       name: '打开 AI 检索',
       callback: () => this.openSearch(),
     });
-    // 品牌分组标记（见 snippets/xyblue135-brand.css）
-    const __brandEl = document.querySelector('.side-dock-ribbon-action[aria-label="' + 'AI 检索' + '"]');
-    if (__brandEl) __brandEl.addClass('xyblue135-ribbon xyblue135-ai');
-    this.addRibbonIcon('graduation-cap', '面试问答控制台', () => this.ivOpenConsole());
-    const __brandIv = document.querySelector('.side-dock-ribbon-action[aria-label="' + '面试问答控制台' + '"]');
-    if (__brandIv) __brandIv.addClass('xyblue135-ribbon xyblue135-ai');
+    this.addRibbonIcon('graduation-cap', '面试问答控制台', () => this.ivOpenConsole())
+      .addClass('xyblue135-ribbon xyblue135-ai');
     this.addCommand({
       id: 'rebuild-ai-search-index',
       name: '重建检索索引',

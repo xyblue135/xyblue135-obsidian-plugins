@@ -34,17 +34,17 @@ xyblue135 的 Obsidian 插件合集（自研 14 个 + 打包的第三方 6 个�
 
 | 插件 | 版本 | 说明 |
 |---|---|---|
-| `00_xyblue135-ai-search` | 1.0.0 | 本地召回 + AI 精排两阶段检索白名单文章，支持语义向量召回、标签/深度过滤、流式 AI 问答与引用跳转；**含面试问答模式**（ragfile 桥接 + 第一人称直答） |
+| `00_xyblue135-ai-search` | 1.0.1 | 本地召回 + AI 精排两阶段检索白名单文章，支持语义向量召回、标签/深度过滤、流式 AI 问答与引用跳转；**含面试问答模式**（ragfile 桥接 + 第一人称直答） |
 | `00_xyblue135-char-count-updater` | 4.1.3 | 按白名单更新 `token_count` 字段，中英文分倍率粗略估算 |
 | `00_xyblue135-docs-archiver` | 1.0.3 | 为 `my_blog/00_docs` 下笔记推荐归档文件夹：AI 推荐为主，本地打分兜底；一键移动 |
 | `00_xyblue135-docs-logo` | 1.0.3 | 仅对白名单目录显示状态图标，支持文件夹 / Markdown / 自定义 SVG |
 | `00_xyblue135-docs-nav` | 0.3.2 | 五种交互视图浏览知识库：技能树、树状图、旭日图、矩形树图、标签星图（ECharts 内置） |
 | `00_xyblue135-files-hider` | 1.0.1 | 右键视觉隐藏指定文件夹，不影响搜索与其他插件访问 |
 | `00_xyblue135-image-zoom` | 1.4.3 | Shift + 滚轮临时调整正文图片尺寸，并提供可配置相框 |
-| `00_xyblue135-launcher` | 0.1.0 | Raycast 式插件启动台：居中浮层，搜索即达，卡片网格 |
+| `00_xyblue135-launcher` | 0.1.1 | Raycast 式插件启动台：居中浮层，搜索即达，卡片网格 |
 | `00_xyblue135-metadata-ai` | 0.10.0 | 用 OpenAI 兼容 API 维护 AI 摘要 / 标签 / 技术深度 / 时效性等 frontmatter 字段；**含模板补全**（新建笔记自动补齐缺失字段） |
 | `00_xyblue135-mirror` | 2.1.2 | 单层共享附件结构，同名笔记共享附件目录，引用计数保护删除 |
-| `00_xyblue135-skill-miner` | 0.11.0 | 把 frontmatter 变成技能资产：技能矩阵、AI 技术画像、模拟面试、简历生成；**含岗位透镜**（目标岗位画像 + 缺口比对） |
+| `00_xyblue135-skill-miner` | 0.11.1 | 把 frontmatter 变成技能资产：技能矩阵、AI 技术画像、模拟面试、简历生成；**含岗位透镜**（目标岗位画像 + 缺口比对） |
 | `00_xyblue135-theme` | 1.1.1 | 无需写 CSS 即可自定义背景 / 文字 / 链接 / 标题 / 代码 / 标签等样式 |
 | `00_xyblue135-undone-workbench` | 0.1.2 | 筛选 `status: undone` 笔记并逐篇引导处理（缺失项分析 / 联动补全） |
 | `00_xyblue135-video-triage` | 0.1.1 | B 站链接 → 字幕 → 要点 → 知识库比对 → 三档判定 → 自动写信箱笔记 |
@@ -61,6 +61,26 @@ xyblue135 的 Obsidian 插件合集（自研 14 个 + 打包的第三方 6 个�
 
 视图 id（`xyblue135-job-lens-view`）与旧 `data.json` 里的设置会自动迁移（`migratedFrom*` 标记防重跑），
 已打开的面板不会变空白；命令 id 变了（加了 `job-lens-` / `template-` / `iv-` 前缀），之前绑的热键要重绑。
+
+### 侧边栏图标怎么变成现在这样
+
+侧栏（ribbon）放哪些图标**不由插件决定，由 CSS 片段决定**：
+`snippets/xyblue135-brand.css` 里有一份「隐藏清单」，按 `aria-label` 精确匹配把图标 `display:none`。
+
+| 现象 | 原因 |
+|---|---|
+| 合并后侧栏出现「面试问答控制台」 | 它替换了原来的「面试检索控制台」，按设计**保留可见**（面试要一键直达） |
+| 「岗位透镜」看不见了 | 它是 `skill-miner` 的副入口，与主入口「技能提炼」一起收进启动台 |
+| 改了图标文案，隐藏就失效 | 清单按 `aria-label` 精确匹配，改名必须同步改清单（`1.0.1` 起已核对过一轮） |
+
+图标要重新显示：删掉 `brand.css` 里对应那行即可。插件自己只负责 `addClass('xyblue135-ribbon xyblue135-ai')`
+上品牌色，不再用 `document.querySelector` 事后查找（那种写法一改文案就静默失效）。
+
+### 启动台的一张插件可以有多张卡
+
+`00_xyblue135-launcher` 的 `PLUGIN_REGISTRY` 同一个 `id` 允许出现多次，用来给合并进来的子功能
+留独立入口——「面试问答控制台」「岗位透镜」「模板补全」各有自己的卡，按老名字直接搜得到。
+数据由 `manifests × enabledPlugins` 驱动：未在注册表里的插件会按 `manifest.name` 兜底成「其他插件」。
 
 ## 打包的第三方插件
 
