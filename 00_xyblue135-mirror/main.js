@@ -16,8 +16,8 @@ const {
 } = require("obsidian");
 
 const DEFAULT_SETTINGS = {
-  notesRoot: "00_docs",
-  attachmentsRoot: "00_assets",
+  notesRoot: "my_blog/00_docs",
+  attachmentsRoot: "my_blog/00_assets",
   structureMode: "note",
   fileNameMode: "smart",
   handlePaste: true,
@@ -813,7 +813,7 @@ module.exports = class MirrorAttachmentsPlugin extends Plugin {
   }
 
   getAttachmentFolderForBasename(basename) {
-    const attachmentRoot = this.cleanRoot(this.settings.attachmentsRoot) || "00_assets";
+    const attachmentRoot = this.cleanRoot(this.settings.attachmentsRoot) || "my_blog/00_assets";
     return normalizePath(`${attachmentRoot}/${basename}`);
   }
 
@@ -897,7 +897,7 @@ module.exports = class MirrorAttachmentsPlugin extends Plugin {
   // 修复 8.17：删除从未被调用的死代码 getRequiredAttachmentPaths / getFoldersUnderRoot。
 
   async auditFolderConsistency() {
-    const attachmentRoot = this.cleanRoot(this.settings.attachmentsRoot) || "00_assets";
+    const attachmentRoot = this.cleanRoot(this.settings.attachmentsRoot) || "my_blog/00_assets";
     const notes = this.getManagedMarkdownFiles();
     const groups = new Map();
 
@@ -1078,7 +1078,7 @@ module.exports = class MirrorAttachmentsPlugin extends Plugin {
     const normalized = this.normalizeKey(notePath);
     const notesRoot = this.normalizeKey(this.cleanRoot(this.settings.notesRoot));
     const attachmentRoot = this.normalizeKey(
-      this.cleanRoot(this.settings.attachmentsRoot) || "00_assets"
+      this.cleanRoot(this.settings.attachmentsRoot) || "my_blog/00_assets"
     );
 
     // 配置了 00_docs 根目录时，只管理该目录下的 Markdown，
@@ -1158,7 +1158,7 @@ module.exports = class MirrorAttachmentsPlugin extends Plugin {
 
   getRecycleRoot() {
     const attachmentRoot =
-      this.cleanRoot(this.settings.attachmentsRoot) || "00_assets";
+      this.cleanRoot(this.settings.attachmentsRoot) || "my_blog/00_assets";
     return normalizePath(`${attachmentRoot}/_MirrorAttachmentsTrash`);
   }
 
@@ -1185,7 +1185,7 @@ module.exports = class MirrorAttachmentsPlugin extends Plugin {
 
   async cleanupEmptyAttachmentParents(startPath) {
     const attachmentRoot = normalizePath(
-      this.cleanRoot(this.settings.attachmentsRoot) || "00_assets"
+      this.cleanRoot(this.settings.attachmentsRoot) || "my_blog/00_assets"
     );
 
     let current = normalizePath(startPath || "");
@@ -1562,7 +1562,7 @@ module.exports = class MirrorAttachmentsPlugin extends Plugin {
     // 修复 8.2 / 8.6：优先使用事件同步阶段抓到的选区快照。
     const insertAt = anchor || this.getEditorAnchor(editor);
     const attachmentRoot = normalizePath(
-      this.cleanRoot(this.settings.attachmentsRoot) || "00_assets"
+      this.cleanRoot(this.settings.attachmentsRoot) || "my_blog/00_assets"
     );
 
     let targetFolder = desiredFolder;
@@ -1781,7 +1781,7 @@ module.exports = class MirrorAttachmentsPlugin extends Plugin {
     const basename = this.getNoteBasenameFromPath(notePath);
     const remainingNotes = this.getNotesByBasename(basename, notePath);
     const folderPath = this.getAttachmentFolderForBasename(basename);
-    const attachmentRoot = this.cleanRoot(this.settings.attachmentsRoot) || "00_assets";
+    const attachmentRoot = this.cleanRoot(this.settings.attachmentsRoot) || "my_blog/00_assets";
 
     // 共享引用仍存在：只更新“引用关系”，绝不碰附件目录。
     if (remainingNotes.length > 0) {
@@ -1943,7 +1943,7 @@ module.exports = class MirrorAttachmentsPlugin extends Plugin {
     const basename = this.getNoteBasenameFromPath(file.path);
     const folderPath = this.getAttachmentFolderForBasename(basename);
     const attachmentRoot =
-      this.cleanRoot(this.settings.attachmentsRoot) || "00_assets";
+      this.cleanRoot(this.settings.attachmentsRoot) || "my_blog/00_assets";
     // 修复 8.11：按不区分大小写解析真实目录。
     const folder = this.getAbstractFileByPathCI(folderPath);
     const isProtectedFolder =
@@ -2190,17 +2190,17 @@ class MirrorAttachmentsSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("笔记根目录")
-      .setDesc("被插件管理的 Markdown 根目录，例如 00_docs。输入完成后（失焦或停顿）才会保存并校验。")
+      .setDesc("被插件管理的 Markdown 根目录，例如 my_blog/00_docs。输入完成后（失焦或停顿）才会保存并校验。")
       .addText((text) => {
-        text.setPlaceholder("00_docs").setValue(this.plugin.settings.notesRoot);
+        text.setPlaceholder("my_blog/00_docs").setValue(this.plugin.settings.notesRoot);
         this.bindRootTextInput(text, "notesRoot", "笔记根目录");
       });
 
     new Setting(containerEl)
       .setName("附件根目录")
-      .setDesc("单层共享附件根目录，建议使用 00_assets。输入完成后（失焦或停顿）才会保存并校验。")
+      .setDesc("单层共享附件根目录，建议使用 my_blog/00_assets。输入完成后（失焦或停顿）才会保存并校验。")
       .addText((text) => {
-        text.setPlaceholder("00_assets").setValue(this.plugin.settings.attachmentsRoot);
+        text.setPlaceholder("my_blog/00_assets").setValue(this.plugin.settings.attachmentsRoot);
         this.bindRootTextInput(text, "attachmentsRoot", "附件根目录");
       });
 
@@ -2212,11 +2212,11 @@ class MirrorAttachmentsSettingTab extends PluginSettingTab {
       text: "单层共享映射规则"
     });
     structureCard.createEl("code", {
-      text: "00_docs/A/test.md + 00_docs/B/test.md  ↔  00_assets/test/"
+      text: "my_blog/00_docs/A/test.md + my_blog/00_docs/B/test.md  ↔  my_blog/00_assets/test/"
     });
     structureCard.createEl("p", {
       text:
-        "父目录完全解耦；移动 00_docs 子目录不会搬附件。同名文件名视为同一个共享附件组。"
+        "父目录完全解耦；移动 my_blog/00_docs 子目录不会搬附件。同名文件名视为同一个共享附件组。"
     });
 
     this.createSectionTitle(
@@ -2275,7 +2275,7 @@ class MirrorAttachmentsSettingTab extends PluginSettingTab {
       title: "嵌入式资源",
       tag: "时间戳 + ![]()",
       extensions: "PNG / JPG / JPEG / GIF / WebP / BMP / SVG / AVIF / PDF",
-      example: "![](/00_assets/test/20260812151230001.png)",
+      example: "![](/my_blog/00_assets/test/20260812151230001.png)",
       description: "图片和 PDF 使用毫秒级时间戳保存并直接嵌入正文，避免截图类文件名大量重复。",
       className: "is-embed"
     });
@@ -2284,7 +2284,7 @@ class MirrorAttachmentsSettingTab extends PluginSettingTab {
       title: "非嵌入式附件",
       tag: "原文件名 + []()",
       extensions: "ZIP / RAR / 7Z / DOC / DOCX / XLS / XLSX / PPT / PPTX / 其他文件",
-      example: "[项目源码.zip](/00_assets/test/项目源码.zip)",
+      example: "[项目源码.zip](/my_blog/00_assets/test/项目源码.zip)",
       description: "压缩包、Office 等保留可读原名；重名自动变为 (1)、(2)…，正文显示完整文件名和扩展名。",
       className: "is-link"
     });
@@ -2310,7 +2310,7 @@ class MirrorAttachmentsSettingTab extends PluginSettingTab {
     });
     linkNote.createEl("strong", { text: "路径规则：" });
     linkNote.appendText(
-      "所有链接均从 Vault 根目录开始，例如 /00_assets/test/...；移动 Markdown 父目录不会改变附件路径。"
+      "所有链接均从 Vault 根目录开始，例如 /my_blog/00_assets/test/...；移动 Markdown 父目录不会改变附件路径。"
     );
 
     this.createSectionTitle(

@@ -85,7 +85,7 @@ const DEFAULT_SETTINGS = {
 
   // ---- 检索与索引 ----
   autoIndexOnStartup: true,
-  whitelistFolder: '00_docs,00_agent_for_projects',  // 逗号/换行分隔多个目录
+  whitelistFolder: 'my_blog/00_docs,my_blog/00_agent_for_projects',  // 逗号/换行分隔多个目录
   includeSubfolders: true,
   recallLimit: 50,           // 评分后保留的候选上限
   maxSources: 4,             // 回答/来源里带的笔记条数
@@ -870,9 +870,13 @@ class RagBridge {
       this.watcher = null;
     }
     const ms = Math.max(100, Number(this.plugin.settings.pollMs) || 300);
-    this.timer = setInterval(() => this.scheduleCheck(), ms);
+    // fs.watch 已就绪时，轮询只是兜底（watch 会立刻触发 scheduleCheck），
+    // 没必要仍按 pollMs 全速跑——默认 300ms 等于每秒 3 次 readFileSync 空转。
+    // 监听失败时才退回 pollMs 的原始节奏。
+    const effectiveMs = this.watcher ? Math.max(ms, 2000) : ms;
+    this.timer = setInterval(() => this.scheduleCheck(), effectiveMs);
     this.scheduleCheck();
-    console.log('[面试检索] ragfile 监听已启动:', dir);
+    console.log(`[面试检索] ragfile 监听已启动: ${dir}（轮询 ${effectiveMs}ms${this.watcher ? '，watch 为主' : '，仅轮询'}）`);
   }
 
   stop() {

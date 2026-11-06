@@ -1,7 +1,7 @@
 {
   "id": "00_xyblue135-interview-rag",
   "name": "xyblue135 · 面试检索",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "minAppVersion": "1.5.0",
   "description": "【面试专用】监听 OBS 转写桥接（ragfile 文件握手），面试官提问后本地加权召回知识库（秒级），再由 AI 组织成回答上悬浮卡；直答模式下 AI 以第一人称口语代替你回答（可开关），召回不准时 AI 会用通用经验补齐并标注，网关不可用自动降级本地要点。评分权重/热词/提示词/清洗规则等精调项齐全。",
   "author": "xyblue135",

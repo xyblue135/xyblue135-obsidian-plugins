@@ -15,7 +15,7 @@ const DEFAULT_SETTINGS = {
     pythonCmd: "python",
     cookiesBrowser: "",
     model: "small",
-    inbox: "00_docs/收件箱",
+    inbox: "my_blog/00_docs/收件箱",
 };
 
 /* ---------------- 链接输入 Modal ---------------- */
@@ -184,9 +184,9 @@ class VideoTriageSettingTab extends obsidian_1.PluginSettingTab {
             }));
         new obsidian_1.Setting(containerEl)
             .setName("收件箱目录")
-            .setDesc("值得看的视频笔记写入位置（默认 00_docs/收件箱）")
+            .setDesc("值得看的视频笔记写入位置（默认 my_blog/00_docs/收件箱）")
             .addText((t) => t.setValue(this.plugin.settings.inbox).onChange(async (v) => {
-                this.plugin.settings.inbox = v.trim() || "00_docs/收件箱";
+                this.plugin.settings.inbox = v.trim() || "my_blog/00_docs/收件箱";
                 await this.plugin.saveSettings();
             }));
     }

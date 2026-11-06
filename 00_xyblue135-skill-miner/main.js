@@ -299,7 +299,7 @@ const DEFAULT_SETTINGS = {
   structuredJsonModeEnabled: true,
   jsonRepairEnabled: true,
 
-  folders: '00_docs',
+  folders: 'my_blog/00_docs',
   minDocsPerSkill: 3,
   tagCanonicalList: BUILTIN_TAG_CANONICAL_LIST,
   ignoreTags: '',
@@ -3263,7 +3263,7 @@ class SkillMinerPlugin extends Plugin {
 
   /** 0.9.0：读取 00_agent_for_projects 的仓库笔记（frontmatter: repo/upstream/pushed_at + AI 14 键）。 */
   loadProjectNotes() {
-    const folder = '00_agent_for_projects';
+    const folder = 'my_blog/00_agent_for_projects';
     const root = this.app.vault.getAbstractFileByPath(folder);
     if (!root || !Array.isArray(root.children)) return [];
     return root.children

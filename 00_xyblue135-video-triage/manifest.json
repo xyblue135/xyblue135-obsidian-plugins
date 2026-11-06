@@ -1,7 +1,7 @@
 {
   "id": "00_xyblue135-video-triage",
   "name": "xyblue135 · 视频分诊",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "minAppVersion": "1.5.0",
   "description": "【xyblue135 开源插件】粘贴 B 站视频链接，自动拉字幕（无字幕则本地 whisper 转写）→ LLM 提取要点 → 与知识库比对 → 三档判定（跳过/速览/值得看）→ 值得看的自动写收件箱笔记，由待完成工作台接管。依赖本机 yt-dlp / ffmpeg / faster-whisper，网关配置复用 AI 元数据插件。",
   "author": "xyblue135",

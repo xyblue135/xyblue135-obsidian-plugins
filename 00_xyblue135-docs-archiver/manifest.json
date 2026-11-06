@@ -1,7 +1,7 @@
 {
   "id": "00_xyblue135-docs-archiver",
   "name": "xyblue135 私人 · 文档归档推荐",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "minAppVersion": "1.5.0",
   "description": "【xyblue135 私人插件】为 00_docs 下的笔记推荐归档文件夹：AI 推荐为主（本地网关 /v1/chat/completions），本地打分兜底；一键移动，附件按文件名索引于 00_assets，移动笔记无需迁移附件。",
   "author": "xyblue135",

@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS = {
     targetFolder: "/待分类",
     // ── 审查模式（创建后自动补全）──
     // 只审查这些目录下的 .md（含子目录）。多个目录用逗号分隔；留空表示整个仓库。
-    auditFolders: "00_docs",
+    auditFolders: "my_blog/00_docs",
     // 是否在 .md 被创建后自动审查并补全缺失字段。
     auditOnCreate: true,
     // 创建后等待多久再审查（毫秒），给 Obsidian 一点时间完成写入与索引。
@@ -980,10 +980,10 @@ class FolderTemplateNoteSettingTab extends obsidian_1.PluginSettingTab {
         });
         new obsidian_1.Setting(containerEl)
             .setName("审查白名单目录")
-            .setDesc("多个目录用逗号分隔，自动包含子目录；留空表示整个仓库。例如：00_docs, 00_暂未分类/待分类")
+            .setDesc("多个目录用逗号分隔，自动包含子目录；留空表示整个仓库。例如：my_blog/00_docs, my_blog/00_暂未分类/待分类")
             .addText((text) => {
             text
-                .setPlaceholder("00_docs")
+                .setPlaceholder("my_blog/00_docs")
                 .setValue(this.plugin.settings.auditFolders)
                 .onChange(async (value) => {
                 this.plugin.settings.auditFolders = value;

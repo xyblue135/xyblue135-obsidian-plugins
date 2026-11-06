@@ -13,7 +13,7 @@ const obsidian_1 = require("obsidian");
 const VIEW_TYPE = "xyblue135-docs-nav-view";
 
 const DEFAULT_SETTINGS = {
-    rootFolder: "00_docs",
+    rootFolder: "my_blog/00_docs",
     topTags: 60,
     cooccurMin: 2,
     minDocsPerSkill: 3,
@@ -979,9 +979,9 @@ class DocsNavSettingTab extends obsidian_1.PluginSettingTab {
         containerEl.createEl("h2", { text: "知识库导航 · 设置" });
         new obsidian_1.Setting(containerEl)
             .setName("白名单目录")
-            .setDesc("只扫描该目录下的 Markdown 笔记（默认 00_docs）")
+            .setDesc("只扫描该目录下的 Markdown 笔记（默认 my_blog/00_docs）")
             .addText((t) => t.setValue(this.plugin.settings.rootFolder).onChange(async (v) => {
-                this.plugin.settings.rootFolder = v.trim() || "00_docs";
+                this.plugin.settings.rootFolder = v.trim() || "my_blog/00_docs";
                 await this.plugin.saveSettings();
             }));
         new obsidian_1.Setting(containerEl)

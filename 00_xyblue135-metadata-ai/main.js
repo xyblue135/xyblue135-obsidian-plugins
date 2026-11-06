@@ -761,7 +761,7 @@ const DEFAULT_SETTINGS = {
   baseUrl: "http://192.168.3.101:3001/v1",
   apiKey: "",
   model: "auto",
-  whitelistFolder: "00_docs",
+  whitelistFolder: "my_blog/00_docs",
   // 0.9.0：时效复检阈值（天）——AI_last_verified 超过该天数进入复检清单；0 = 关闭年龄检测。
   recheckAgeDays: 90,
   // 0.9.0：定期巡检间隔（小时）——后台跑 14 键格式巡检并弹 Notice 摘要；0 = 关闭。
@@ -1700,8 +1700,17 @@ module.exports = class AiMetadataPlugin extends Plugin {
   refreshStatusBar() {
     if (!this.statusBarItem) return;
     const enabled = this.settings.statusBarEnabled !== false;
-    this.statusBarItem.toggleClass("is-hidden", !enabled);
-    if (!enabled) return;
+    // 每秒 ticker 会反复调到这里：只有显隐状态真的变了才碰 DOM，
+    // 否则每秒都 toggleClass 一次是纯浪费（会触发样式重算）。
+    if (this._statusHidden !== !enabled) {
+      this.statusBarItem.toggleClass("is-hidden", !enabled);
+      this._statusHidden = !enabled;
+    }
+    if (!enabled) {
+      this._statusText = null;
+      this._statusTooltip = null;
+      return;
+    }
 
     const status = this.runtimeStatus || { mode: "idle" };
     let text = "AI：空闲";
@@ -1729,9 +1738,16 @@ module.exports = class AiMetadataPlugin extends Plugin {
       text = "AI：仅手动模式";
     }
 
+    // 文本与 tooltip 都没变就不写 DOM。空闲时每秒一次 setText + 两次 setAttribute
+    // 会让状态栏持续重排；「等待」模式下剩余秒数在变，仍会照常刷新。
+    const tooltip = this.getStatusBarTooltip();
+    if (this._statusText === text && this._statusTooltip === tooltip) return;
+    this._statusText = text;
+    this._statusTooltip = tooltip;
+
     this.statusBarItem.setText(text);
-    this.statusBarItem.setAttribute("aria-label", this.getStatusBarTooltip());
-    this.statusBarItem.setAttribute("title", this.getStatusBarTooltip());
+    this.statusBarItem.setAttribute("aria-label", tooltip);
+    this.statusBarItem.setAttribute("title", tooltip);
   }
 
   async waitForApiGap(context = {}) {
@@ -1774,11 +1790,11 @@ module.exports = class AiMetadataPlugin extends Plugin {
 
   // 多根白名单：逗号/中文逗号/换行分隔（如 00_docs,00_agent_for_projects）。
   whitelistRoots() {
-    const roots = String(this.settings.whitelistFolder || "00_docs")
+    const roots = String(this.settings.whitelistFolder || "my_blog/00_docs")
       .split(/[,，\n]/)
       .map((item) => item.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, ""))
       .filter(Boolean);
-    return roots.length ? roots : ["00_docs"];
+    return roots.length ? roots : ["my_blog/00_docs"];
   }
 
   isWhitelisted(file) {
@@ -5299,9 +5315,9 @@ class AiMetadataSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("白名单目录")
-      .setDesc("根目录，支持逗号分隔多个（如 00_docs,00_agent_for_projects）。这些目录及其子目录中的 .md 显示 AI 图标并参与自动更新。")
+      .setDesc("根目录，支持逗号分隔多个（如 my_blog/00_docs,my_blog/00_agent_for_projects）。这些目录及其子目录中的 .md 显示 AI 图标并参与自动更新。")
       .addText((text) => text.setValue(this.plugin.settings.whitelistFolder).onChange(async (value) => {
-        this.plugin.settings.whitelistFolder = value.trim().replace(/^\/+|\/+$/g, "") || "00_docs";
+        this.plugin.settings.whitelistFolder = value.trim().replace(/^\/+|\/+$/g, "") || "my_blog/00_docs";
         // 1.3：文本输入逐字符触发，改为防抖落盘，避免每次按键都全量写 data.json
         this.plugin.scheduleStateSave(400);
         this.plugin.scheduleInjection();

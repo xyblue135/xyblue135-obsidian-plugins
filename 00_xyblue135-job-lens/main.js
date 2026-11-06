@@ -14,7 +14,7 @@ const obsidian_1 = require("obsidian");
 const VIEW_TYPE = "xyblue135-job-lens-view";
 
 const DEFAULT_SETTINGS = {
-    inbox: "00_docs/收件箱",
+    inbox: "my_blog/00_docs/收件箱",
     skillMinerId: "00_xyblue135-skill-miner",
     lastRole: "",
     history: [],
@@ -463,9 +463,9 @@ class JobLensSettingTab extends obsidian_1.PluginSettingTab {
         containerEl.createDiv({ cls: "xyjl-hint", text: "报告 MD 保存在插件目录 reports/ 内；导出的学习待办在下方收件箱目录。" });
         new obsidian_1.Setting(containerEl)
             .setName("收件箱目录")
-            .setDesc("缺口导出的待办笔记位置（默认 00_docs/收件箱）")
+            .setDesc("缺口导出的待办笔记位置（默认 my_blog/00_docs/收件箱）")
             .addText((t) => t.setValue(this.plugin.settings.inbox).onChange(async (v) => {
-                this.plugin.settings.inbox = v.trim() || "00_docs/收件箱";
+                this.plugin.settings.inbox = v.trim() || "my_blog/00_docs/收件箱";
                 await this.plugin.saveSettings();
             }));
     }

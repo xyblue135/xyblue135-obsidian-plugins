@@ -22,7 +22,7 @@ const {
 const DEFAULT_SETTINGS = {
   debounceMs: 5000,
   // 白名单：每行一个路径，可写文件夹（含全部子笔记）或单个文件；为空则不处理任何文件
-  whitelist: "00_docs",
+  whitelist: "my_blog/00_docs",
   enableTokenCount: true,
   // 估算模式：false = 统一倍率（unifiedTokenFactor），true = 中英文分拆倍率；
   // 两者互斥，只有一组倍率参与计算。默认统一倍率，使 0.55 默认真实生效。
@@ -787,10 +787,10 @@ class CharCountSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("白名单目录 / 文件")
-      .setDesc("默认 00_docs（含其下全部子笔记）。每行一个路径，例如 00_docs")
+      .setDesc("默认 my_blog/00_docs（含其下全部子笔记）。每行一个路径，例如 my_blog/00_docs")
       .addTextArea((text) => {
         const input = text
-          .setPlaceholder("00_docs")
+          .setPlaceholder("my_blog/00_docs")
           .setValue(this.plugin.settings.whitelist)
           .onChange((value) => {
             // 逐字输入只做防抖保存，失焦时立即落盘

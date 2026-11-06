@@ -53,7 +53,7 @@ const DEFAULT_SETTINGS = {
   structuredJsonModeEnabled: true,
   jsonRepairEnabled: true,
 
-  whitelistFolder: '00_docs',
+  whitelistFolder: 'my_blog/00_docs',
   includeSubfolders: true,
   localRecallLimit: 50,
 
@@ -1492,7 +1492,7 @@ class AISearchSettingTab extends PluginSettingTab {
     new Setting(contentEl).setName('检索').setHeading();
     new Setting(contentEl)
       .setName('白名单目录')
-      .setDesc('只检索这些目录下的文章（默认 00_docs，支持逗号分隔多个）；修改后请点击下方“重建索引”')
+      .setDesc('只检索这些目录下的文章（默认 my_blog/00_docs，支持逗号分隔多个）；修改后请点击下方“重建索引”')
       .addText((t) => t.setValue(s.whitelistFolder).onChange(async (v) => { s.whitelistFolder = v.trim(); await this.plugin.saveSettings(); }));
     new Setting(contentEl)
       .setName('包含子目录')

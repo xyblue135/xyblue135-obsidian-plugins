@@ -15,8 +15,8 @@
 var obsidian = require('obsidian');
 
 const DEFAULT_SETTINGS = {
-	notesRoot: '00_docs',
-	assetsRoot: '00_assets',
+	notesRoot: 'my_blog/00_docs',
+	assetsRoot: 'my_blog/00_assets',
 	aiEnabled: true,
 	aiBaseUrl: 'http://127.0.0.1:31415/v1',
 	// 密钥不写进源码：真实值放在 data.json（与本库其它 AI 插件一致），
@@ -501,20 +501,20 @@ class DocsArchiverSettingTab extends obsidian.PluginSettingTab {
 
 		new obsidian.Setting(containerEl)
 			.setName('笔记根目录')
-			.setDesc('在此目录下提供归档推荐（默认 00_docs）')
+			.setDesc('在此目录下提供归档推荐（默认 my_blog/00_docs）')
 			.addText((t) =>
 				t.setValue(this.plugin.settings.notesRoot).onChange(async (v) => {
-					this.plugin.settings.notesRoot = v.trim() || '00_docs';
+					this.plugin.settings.notesRoot = v.trim() || 'my_blog/00_docs';
 					await this.plugin.saveSettings();
 				})
 			);
 
 		new obsidian.Setting(containerEl)
 			.setName('附件根目录')
-			.setDesc('仅用于提示文案展示（默认 00_assets，移动笔记时不会改动它）')
+			.setDesc('仅用于提示文案展示（默认 my_blog/00_assets，移动笔记时不会改动它）')
 			.addText((t) =>
 				t.setValue(this.plugin.settings.assetsRoot).onChange(async (v) => {
-					this.plugin.settings.assetsRoot = v.trim() || '00_assets';
+					this.plugin.settings.assetsRoot = v.trim() || 'my_blog/00_assets';
 					await this.plugin.saveSettings();
 				})
 			);

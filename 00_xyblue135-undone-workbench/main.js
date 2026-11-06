@@ -13,7 +13,7 @@ const obsidian_1 = require("obsidian");
 const VIEW_TYPE = "xyblue135-undone-workbench-view";
 
 const DEFAULT_SETTINGS = {
-    folders: "00_docs",
+    folders: "my_blog/00_docs",
     staleDays: 90,
     placeholderTokens: 300,
     sort: "updated",
@@ -296,7 +296,7 @@ class WorkbenchSettingTab extends obsidian_1.PluginSettingTab {
             .setDesc("每行一个目录，只统计这些目录里的笔记")
             .addTextArea((t) => {
                 t.setValue(this.plugin.settings.folders).onChange(async (v) => {
-                    this.plugin.settings.folders = v.trim() || "00_docs";
+                    this.plugin.settings.folders = v.trim() || "my_blog/00_docs";
                     await this.plugin.saveSettings();
                 });
                 t.inputEl.rows = 3;

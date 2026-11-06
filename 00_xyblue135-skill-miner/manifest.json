@@ -1,7 +1,7 @@
 {
   "id": "00_xyblue135-skill-miner",
   "name": "xyblue135 · 技能提炼",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "minAppVersion": "1.5.0",
   "description": "【xyblue135 开源插件】把笔记 frontmatter 变成技能资产：技能矩阵可视化（象限图/雷达/时间线/技能树，仅统计 status: done）、AI 技术画像与可勾选简历素材、行业雷达、AI_qa 模拟面试；GitHub 白名单项目融入画像，证书等手动补充素材暂存，并按版式 D（GitHub 风格）一键生成简历 HTML。接口与 AI 元数据插件一致（OpenAI 兼容）。",
   "author": "xyblue135",
