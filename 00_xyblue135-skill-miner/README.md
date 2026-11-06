@@ -51,7 +51,7 @@
 | 分组 | 项 |
 | --- | --- |
 | 接口 | `baseUrl`、`apiKey`、`model`、`requestTimeoutSeconds`、`structuredJsonModeEnabled`、`jsonRepairEnabled` |
-| 统计 | `folders`（默认 `00_docs`）、`minDocsPerSkill`（默认 3）、`tagCanonicalList`、`ignoreTags` |
+| 统计 | `folders`（默认 `my_blog/00_docs`）、`minDocsPerSkill`（默认 3）、`tagCanonicalList`、`ignoreTags` |
 | 输出 | `outputFolder`（生成的学习计划/画像落这里）、`interviewCount`（模拟面试题数，默认 5） |
 | 简历 | `resumeAppendixEnabled`、`resumeHarness` |
 | GitHub | `githubUsername`、`repoWhitelist`（仓库白名单，每行一个） |

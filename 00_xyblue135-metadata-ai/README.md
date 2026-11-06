@@ -1,6 +1,6 @@
 # xyblue135 · AI 元数据
 
-用兼容 OpenAI 的接口，为 `00_docs` 下的笔记维护一整套 frontmatter 元数据。
+用兼容 OpenAI 的接口，为 `my_blog/00_docs` 下的笔记维护一整套 frontmatter 元数据。
 **每个字段都能单独生成、单独校验**，不强迫你一次跑完整套。
 
 ## 管理的 10 个字段
@@ -49,7 +49,7 @@
 | 分组 | 项 |
 | --- | --- |
 | 接口 | `baseUrl`、`apiKey`、`model`、`requestTimeoutSeconds`、`requestIntervalSeconds` |
-| 范围 | `whitelistFolder`（默认 `00_docs`）、`statusDoneOnlyEnabled` |
+| 范围 | `whitelistFolder`（默认 `my_blog/00_docs`）、`statusDoneOnlyEnabled` |
 | 摘要 | `summaryShortMaxChars`、`summaryLongMaxChars`（各带一个 `…Enabled` 开关）、`summaryMarkdownCleanupEnabled` |
 | 标签 | `maxTags`（默认 7）、`technicalTagCanonicalList` |
 | 自动化 | `autoUpdateEnabled`、`autoUpdateMinutes`、`contentFingerprintEnabled`、`experimentalCombinedRequestEnabled` |

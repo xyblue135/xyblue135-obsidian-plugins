@@ -23,7 +23,7 @@ OBS 转写 → bridge.py 组句 → rag/query.json
 // answer.json
 { "id": 1730000000000,
   "answer": "……",
-  "sources": [{ "path": "00_docs/...", "title": "..." }] }
+  "sources": [{ "path": "my_blog/00_docs/...", "title": "..." }] }
 ```
 
 - `id` 是毫秒时间戳；同一个 `id` 只应答一次。
@@ -66,7 +66,7 @@ AI 精答（用召回笔记作资料组织答案）
 ## 设置
 
 - **桥接**：`bridgeEnabled`、`ragDir`、`pollMs`、`answerDeadlineMs`、`hotwordsFile`
-- **索引**：`autoIndexOnStartup`、`whitelistFolder`（默认 `00_docs,00_agent_for_projects`）、`includeSubfolders`
+- **索引**：`autoIndexOnStartup`、`whitelistFolder`（默认 `my_blog/00_docs,my_blog/00_agent_for_projects`）、`includeSubfolders`
 - **召回**：`recallLimit`、`maxSources`、`minScore`、`wStrong`、`wBody`、`phraseBonusStrong`、`phraseBonusBody`、`hotwordBoost`
 - **回答**：`snippetRadius`、`answerTitle`、`maxAnswerChars`、`showSourcePaths`
 - **清洗**：`minQuestionChars`、`noiseRegex`（多行正则，命中的问题视为转写噪声）
