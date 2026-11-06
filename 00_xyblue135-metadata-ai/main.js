@@ -820,8 +820,10 @@ const DEFAULT_SETTINGS = {
   metadataKeyOrder: DEFAULT_METADATA_KEY_ORDER,
   // 方案B:AI_* 十键外置存储(00_metadata 平铺)。开启后存取都走 sidecar 文件,
   // 正文 frontmatter 只留工作流键(status/visibility/updated/token_count)。
+  // 路径是 vault 根相对：文章下沉到 my_blog/ 后必须带前缀，
+  // 否则 sidecar 会写到两个仓库之外（vault 根），既不进备份也搜不到。
   sidecarModeEnabled: false,
-  metadataStoreFolder: "00_metadata",
+  metadataStoreFolder: "my_blog/00_metadata",
 };
 
 const DEFAULT_STATE = {

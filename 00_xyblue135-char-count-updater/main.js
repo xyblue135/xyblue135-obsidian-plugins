@@ -552,9 +552,15 @@ class CharCountUpdaterPlugin extends Plugin {
       hash ^= path.charCodeAt(i);
       hash = Math.imul(hash, 0x01000193);
     }
+    const suffix = "__" + (hash >>> 0).toString(16).padStart(8, "0");
+    // 与 metadata-ai 的 metadataStoreFolder 默认值保持一致。文章下沉到 my_blog/ 之后，
+    // sidecar 实际落在 my_blog/00_metadata/；旧位置（vault 根）仍保留在候选里，
+    // 免得当年留下的 sidecar 突然读不到。
     return [
+      "my_blog/00_metadata/" + base + ".md",
+      "my_blog/00_metadata/" + base + suffix + ".md",
       "00_metadata/" + base + ".md",
-      "00_metadata/" + base + "__" + (hash >>> 0).toString(16).padStart(8, "0") + ".md",
+      "00_metadata/" + base + suffix + ".md",
     ];
   }
 

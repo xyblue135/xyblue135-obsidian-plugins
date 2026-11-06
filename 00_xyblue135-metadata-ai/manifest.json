@@ -1,7 +1,7 @@
 {
   "id": "00_xyblue135-metadata-ai",
   "name": "xyblue135 · AI 元数据",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "minAppVersion": "1.7.2",
   "description": "【xyblue135 开源插件】使用兼容 OpenAI 的 API 为 00_docs 维护 AI_summary_short/long、加权 AI_tags、AI_technical_depth、AI_take、AI_qa、AI_title 与时效性三键（AI_freshness / AI_freshness_note / AI_last_verified）；每个字段都有独立的生成与格式校验按钮。",
   "author": "xyblue135",

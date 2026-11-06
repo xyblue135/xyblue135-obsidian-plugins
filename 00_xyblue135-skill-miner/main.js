@@ -303,7 +303,7 @@ const DEFAULT_SETTINGS = {
   minDocsPerSkill: 3,
   tagCanonicalList: BUILTIN_TAG_CANONICAL_LIST,
   ignoreTags: '',
-  outputFolder: '00_未分类',
+  outputFolder: 'my_blog/不受监管的文档/00_暂未分类',
 
   interviewCount: 5,
 
