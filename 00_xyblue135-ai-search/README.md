@@ -102,49 +102,82 @@ answer.json = {"id": <同 id>, "answer": "...", "sources": [{"path", "title"}]}
 
 **② 命令面板**：搜「重建检索索引」—— 强制全量，清空后重扫。
 
-**③ 让 agent 离线重建（推荐）**
+**③ 命令行程序 xyindex（推荐）**
 
-前两种要 Obsidian 开着、点按钮、等状态栏跑完，中间看不到任何细节。第三种在终端里跑，
-能直接拿到「扫了多少 / 进索引多少 / 多少篇没有正文 / 有没有埋雷」的数字，出问题当场能定位。
+配套的独立程序，不打开 Obsidian 就能重建，并给出可以直接判读的数字。
+路径 `D:\2document\00_github_private\xyblue-index`，只要 Node ≥ 18，零依赖。
 
 ```bash
-cd <vault>/.obsidian/plugins/00_xyblue135-ai-search
-node tools/rebuild-index.js          # 真重建并写盘
-node tools/rebuild-index.js --dry    # 只看统计，不写盘
+xyindex config vault "D:\2document\obsidian_data"   # 设一次默认 vault
+xyindex rebuild                  # 真重建并写盘
+xyindex rebuild --dry            # 只看统计，不写盘
+xyindex stats                    # 索引体检
+xyindex verify                   # 结构 / 一致性 / 死链 / 能否真 load()
 ```
 
-脚本走的是插件自己的 `reconcile()` + `saveNow()`，产物与点按钮完全同构
-（`tools/offline-harness.js` 提供假 obsidian 模块，不启动 Obsidian、不联网、不调 API）。
+它走的是本插件自己的 `reconcile()` + `saveNow()`，产物与点按钮完全同构
+（用假 `obsidian` 模块在 Node 里真跑插件代码，不启动 Obsidian、不联网、不调 API）。
+所以插件升级后它的结果自动跟着变，不存在「两份索引算法对不上」的问题。
+
 正常输出：
 
 ```
-vault 内 .md 总数      : 796
-白名单内（进索引）      : 765
-  ├ 新增 / 更新        : 765 / 0
-  ├ 正文为空（纯元数据）: 14 ← 只有 frontmatter，靠摘要文本检索
-  └ strongText 为空的   : 0
-正文总字数             : 2,134,665
-耗时                   : 0.7 s
-
-index.json            : 4.44 MB
-  version / files     : 1 / 765
-  whitelist           : my_blog/00_docs,my_blog/00_agent_for_projects
-  fmFallback 标记     : 0 （无，正常）
-  重新 load()         : OK docs = 765
+  白名单外（不进索引）  31  vault 内 .md 共 796
+  进索引                765  whitelist = my_blog/00_docs,my_blog/00_agent_for_projects
+    ├ 正文为空          14  只有 frontmatter，靠摘要文本检索
+    ├ strongText 为空   0
+    └ 带向量            0 / 765  embeddingEnabled 关闭
+  正文总字数       2,134,665
+  index.json       4.44 MB
+  fmFallback 标记  0  正常
+  耗时             0.8s
 ```
 
-**判读标准**
+**判读标准**（任一条不对就继续查）
 
-- `白名单内` 应等于白名单目录里的 md 数量。少于它 = 白名单配错，或有文件读不到
-- `strongText 为空的` 必须是 0。非 0 说明这些笔记连标题都没解析出来，搜不到
+- `进索引` 应等于白名单目录里的 md 数量。少于它 = 白名单配错，或有文件读不到
+- `strongText 为空` 必须是 0。非 0 说明这些笔记连标题都没解析出来，搜不到
 - `fmFallback 标记` 必须是 0。非 0 表示写入时元数据没就绪，Obsidian 下次启动会把全部文档重解析一遍
-- `重新 load()` 必须 `OK`，且 `docs` 与 `files` 相等
+- `带向量` 只有开着 `embeddingEnabled` 时才应该 > 0
 
-**注意**
+### 索引所有者：谁写 index.json
 
-- Obsidian 开着时改 `index.json`，关掉面板前可能被内存里的旧索引覆盖 —— **重建完重启一次 Obsidian**
-- `index.json.tmp` 是原子写的中间产物，残留可直接删
-- 重建不花钱、不调接口；向量是另一回事，见下
+`indexOwner` 决定索引由谁维护：
+
+| 值 | 行为 |
+|---|---|
+| `plugin`（默认） | 插件自己扫描、自己写，和以前完全一样 |
+| `external` | 插件**只读**，不再启动同步、不再定期重建；`index.json` 变化后 3 秒内自动重载 |
+
+选 `external` 就是「程序建、插件读」：命令行跑完 `xyindex rebuild`，Obsidian 里几秒就生效，
+不会出现「程序刚建完、插件启动又覆盖回去」。
+
+代价只有一个：插件设置里那个「立即重建」按钮别再用 —— 它是插件自己重写索引，两边都写就又乱了。
+改完这个开关要重启一次 Obsidian 才完全生效。
+
+### 检索权重可调
+
+`wStrong` / `wBody` / `phraseBonusStrong` / `phraseBonusBody` / `minScore` 五个键现在可配，
+默认值 6 / 1 / 25 / 12 / 0 —— **等于历史硬编码值**，不动它们就完全等价于以前的行为。
+
+调参别凭感觉，先用 `compare` 扫一遍看排序怎么动：
+
+```bash
+xyindex compare "回表" --sweep=wStrong:2,4,6,10,16 --top=5      # 看榜单变化
+xyindex compare "索引" --sweep=wStrong:2,6,12 --target="隐藏row_id"  # 盯住某一篇的排名
+xyindex config set wStrong 12                                   # 满意了写回插件
+```
+
+所有取值下排名都不变时，它会直接告诉你「这个参数对这个 query 不敏感」，省掉无效调参。
+
+`xyindex search "词" --explain` 还能看出某篇是靠标题、摘要还是正文排上来的：
+
+```
+#1 【索引】索引简单说明
+   mysql S2 B1  索引 T2 S26 B42
+```
+
+T = 标题命中，S = strongText（标题+标签+AI 摘要）命中，B = 正文命中，数字是次数。
 
 ### 为什么有的笔记搜出来没有正文
 
@@ -168,8 +201,10 @@ index.json            : 4.44 MB
 **接口**（两个模式共用）：`baseUrl`（默认 `http://127.0.0.1:31415/v1`）、`apiKey`、`requestTimeoutSeconds`、
 `structuredJsonModeEnabled`、`jsonRepairEnabled`
 
-**索引范围**：`whitelistFolder`、`includeSubfolders`、`localRecallLimit`、`autoIndexOnStartup`、
-`incrementalUpdateEnabled`、`autoRebuildHours`
+**索引范围**：`whitelistFolder`、`includeSubfolders`、`localRecallLimit`、`indexOwner`（`plugin` / `external`）、
+`autoIndexOnStartup`、`incrementalUpdateEnabled`、`autoRebuildHours`
+
+**检索权重**：`wStrong`、`wBody`、`phraseBonusStrong`、`phraseBonusBody`、`minScore`（默认 6 / 1 / 25 / 12 / 0）
 
 **语义召回**：`embeddingEnabled`、`embeddingModel`、`embeddingBatchSize`
 

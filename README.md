@@ -85,23 +85,30 @@ xyblue135 的 Obsidian 插件合集（自研 13 个 + 打包的第三方 6 个�
 搜索框的 `Enter` / `Ctrl+Enter`（提交/追问）、归档面板的 `↑↓ Enter`、
 `mirror` 在文件树里拦 `Delete` 弹附件回收确认、`image-zoom` 的 `Shift/Alt + 滚轮`（鼠标手势）。
 
-### 重建检索索引（建议让 agent 跑）
+### 重建检索索引（建议用 xyindex 程序）
 
 索引是 `00_xyblue135-ai-search/index.json`，**不在 git 里**，删了也能重建。
-界面上有「重建检索索引」按钮和命令，但点了之后只能看状态栏，出问题看不到原因。
-要核对结果时直接让 agent 跑：
+界面上有「重建检索索引」按钮，但点了之后只能看状态栏，出问题看不到原因。
+
+配套的独立程序 `xyindex` 就是为了这个（**不在本仓库**，在
+`D:\2document\00_github_private\xyblue-index`，只要 Node ≥ 18，零依赖）：
 
 ```bash
-cd .obsidian/plugins/00_xyblue135-ai-search
-node tools/rebuild-index.js --dry   # 先看统计，不写盘
-node tools/rebuild-index.js         # 真重建
+xyindex config vault "D:\2document\obsidian_data"   # 设一次默认 vault
+xyindex rebuild --dry    # 先看统计，不写盘
+xyindex rebuild          # 真重建
+xyindex stats            # 索引体检
+xyindex verify           # 结构 / 一致性 / 死链 / 能否真 load()
 ```
 
-不用开 Obsidian、不联网、不调接口，输出里有「进索引多少篇 / 多少篇没有正文 / 
-有没有埋 fmFallback 雷 / 回读能否 load」四项硬指标。判读标准与排错见
+不用开 Obsidian、不联网、不调接口。输出里有「进索引多少篇 / 多少篇没有正文 /
+有没有埋 fmFallback 雷 / 带不带向量」这些能直接判读的数字。判读标准与排错见
 [`00_xyblue135-ai-search/README.md`](00_xyblue135-ai-search/README.md) 的「索引」章节。
 
-**改完索引要重启 Obsidian**，否则内存里的旧索引会在保存时把文件覆盖回去。
+**想彻底避免「程序刚建完、插件启动又覆盖回去」**：把插件的「索引所有者」改成 `external`。
+之后插件只读索引，文件更新后 3 秒内自动重载，写盘只有 `xyindex rebuild` 一个入口。
+不改成 `external` 的话，改完索引仍然需要重启 Obsidian。
+
 
 ## 打包的第三方插件
 

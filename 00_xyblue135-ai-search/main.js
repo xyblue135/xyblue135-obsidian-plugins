@@ -126,6 +126,14 @@ const DEFAULT_SETTINGS = {
   qaContextCharsPerDoc: 1200,
 
   autoIndexOnStartup: true,
+  // 索引所有者：plugin = 本插件自己扫描并写 index.json（默认）；external = 交给外部程序（xyindex）维护，本插件只读
+  indexOwner: 'plugin',
+  // 主检索权重（本地召回第一阶段）。这五个默认值 = 历史硬编码值，改成可配置不改变既有排序
+  wStrong: 6,
+  wBody: 1,
+  phraseBonusStrong: 25,
+  phraseBonusBody: 12,
+  minScore: 0,
   incrementalUpdateEnabled: true,
   statusBarEnabled: true,
   autoRebuildHours: 0,
@@ -481,6 +489,19 @@ class SearchIndex {
       }
       return path.startsWith(folder + '/');
     });
+  }
+
+  /** 主检索权重：数值非法或缺失时回落到历史默认值，保证行为不变 */
+  tuneOpts() {
+    const s = this.plugin.settings || {};
+    const n = (v, dflt) => (Number.isFinite(Number(v)) ? Number(v) : dflt);
+    return {
+      wStrong: n(s.wStrong, 6),
+      wBody: n(s.wBody, 1),
+      phraseBonusStrong: n(s.phraseBonusStrong, 25),
+      phraseBonusBody: n(s.phraseBonusBody, 12),
+      minScore: n(s.minScore, 0),
+    };
   }
 
   indexFilePath() {
@@ -934,7 +955,7 @@ class SearchIndex {
    */
   async searchHybrid(query, limit, filter) {
     // 只在需要退回关键词时才算一次，避免同一查询扫全库两遍（2.7）
-    const kwFallback = () => ({ results: this.searchLocal(query, limit, filter), semantic: false });
+    const kwFallback = () => ({ results: this.searchLocal(query, limit, filter, this.tuneOpts()), semantic: false });
     if (!this.plugin.settings.embeddingEnabled || this._embFailed) return kwFallback();
     let qvec = null;
     try {
@@ -945,7 +966,7 @@ class SearchIndex {
     if (!qvec) return kwFallback();
 
     const terms = [...new Set(tokenize(query))].slice(0, 12);
-    const pool = this.searchLocal(query, Math.max((limit || 50) * 4, 200), filter);
+    const pool = this.searchLocal(query, Math.max((limit || 50) * 4, 200), filter, this.tuneOpts());
     const sem = this.applyFilter([...this.docs.values()], filter)
       .filter((d) => Array.isArray(d.vector) && d.vector.length === qvec.length)
       .map((d) => ({ doc: d, sim: cosineSim(qvec, d.vector) }))
@@ -2076,6 +2097,49 @@ class AISearchSettingTab extends PluginSettingTab {
 
     new Setting(contentEl).setName('索引').setHeading();
     new Setting(contentEl)
+      .setName('索引所有者')
+      .setDesc('plugin = 本插件自己扫描并写 index.json（默认）；external = 索引由外部程序（如 xyindex 命令行）维护，本插件只读，文件更新后 3 秒内自动重载。选 external 后「启动时自动同步」和「定期重建」会自动失效，不再跟外部程序抢写。')
+      .addDropdown((d) => d.addOption('plugin', 'plugin（插件自己建）').addOption('external', 'external（外部程序建）')
+        .setValue(s.indexOwner || 'plugin')
+        .onChange(async (v) => {
+          s.indexOwner = v;
+          await this.plugin.saveSettings();
+          this.plugin.armPeriodicRebuild();
+          if (v === 'external') this.plugin.watchExternalIndex();
+          new Notice(v === 'external' ? 'AI 检索：索引改由外部程序维护，重启 Obsidian 后完全生效' : 'AI 检索：索引改回插件维护，重启 Obsidian 后生效');
+        }));
+    new Setting(contentEl)
+      .setName('标题/摘要权重')
+      .setDesc('本地召回里「标题+标签+AI 摘要」命中的权重（默认 6）。调参：xyindex compare "<关键词>" --sweep=wStrong:2,4,6,10')
+      .addText((t) => t.setValue(String(s.wStrong ?? 6)).onChange(async (v) => {
+        const n = Number(v); s.wStrong = Number.isFinite(n) && n >= 0 ? n : 6; await this.plugin.saveSettings();
+      }));
+    new Setting(contentEl)
+      .setName('正文权重')
+      .setDesc('正文命中的权重（默认 1）。标题/摘要权重太高时，正文长的笔记会被压下去')
+      .addText((t) => t.setValue(String(s.wBody ?? 1)).onChange(async (v) => {
+        const n = Number(v); s.wBody = Number.isFinite(n) && n >= 0 ? n : 1; await this.plugin.saveSettings();
+      }));
+    new Setting(contentEl)
+      .setName('短语加成（摘要 / 正文）')
+      .setDesc('整串连续命中时的额外加分，默认 25 / 12')
+      .addText((t) => {
+        t.setValue(String(s.phraseBonusStrong ?? 25));
+        t.inputEl.style.width = '70px';
+        t.onChange(async (v) => { const n = Number(v); s.phraseBonusStrong = Number.isFinite(n) && n >= 0 ? n : 25; await this.plugin.saveSettings(); });
+      })
+      .addText((t) => {
+        t.setValue(String(s.phraseBonusBody ?? 12));
+        t.inputEl.style.width = '70px';
+        t.onChange(async (v) => { const n = Number(v); s.phraseBonusBody = Number.isFinite(n) && n >= 0 ? n : 12; await this.plugin.saveSettings(); });
+      });
+    new Setting(contentEl)
+      .setName('最低分门槛')
+      .setDesc('低于该分数的命中直接丢弃（默认 0 = 不过滤）。结果太杂时调 3~8')
+      .addText((t) => t.setValue(String(s.minScore ?? 0)).onChange(async (v) => {
+        const n = Number(v); s.minScore = Number.isFinite(n) && n >= 0 ? n : 0; await this.plugin.saveSettings();
+      }));
+    new Setting(contentEl)
       .setName('启动时自动同步索引')
       .setDesc('打开 Obsidian 后自动比对白名单目录，增量更新索引')
       .addToggle((t) => t.setValue(s.autoIndexOnStartup).onChange(async (v) => { s.autoIndexOnStartup = v; await this.plugin.saveSettings(); }));
@@ -2412,12 +2476,15 @@ class AISearchPlugin extends Plugin {
     // 启动同步：等元数据缓存就绪后再全量比对，否则兜底解析结果会被 hash 固化（2.3）
     const runStartupSync = async () => {
       if (this._unloaded) return;
-      if (this.settings.autoIndexOnStartup) {
+      const external = this.settings.indexOwner === 'external';
+      if (this.settings.autoIndexOnStartup && !external) {
         await this.index.load();
         await this.index.reconcile();
         await this.index.saveNow();
       } else {
         await this.index.load();
+        // 外部模式：索引由 xyindex 之类的外部程序维护，这里只读，并盯着文件变化自动重载
+        if (external) this.watchExternalIndex();
       }
       if (this._unloaded) return;
       // 索引就绪后才开 ragfile 监听：否则启动瞬间来的提问会查到空索引直接回「未找到」
@@ -2460,7 +2527,34 @@ class AISearchPlugin extends Plugin {
 
   // 定期重建：按小时数挂定时器；非 force 的 rebuildIndex 走 reconcile 全量比对，
   // 未变文件复用已有向量，代价远低于手动 force 重建。改动设置后重新挂载。
+  /** 外部索引所有者模式：看 index.json 的 mtime，变了就重载。3 秒一次，stat 开销可忽略 */
+  watchExternalIndex() {
+    if (this._extIndexTimer) return;
+    const idxPath = this.index.indexFilePath();
+    let last = -1;
+    this._extIndexTimer = this.registerInterval(window.setInterval(async () => {
+      if (this._unloaded) return;
+      try {
+        const st = await this.app.vault.adapter.stat(idxPath);
+        const m = st && st.mtime ? st.mtime : 0;
+        if (last < 0) { last = m; return; }
+        if (m <= last) return;
+        last = m;
+        const ok = await this.index.load();
+        if (ok) {
+          this.refreshStatusBar();
+          new Notice('AI 检索：已载入外部索引（' + this.index.docs.size + ' 篇）');
+        }
+      } catch (e) { /* 外部程序可能正在写，下一轮再试 */ }
+    }, 3000));
+  }
+
+
   armPeriodicRebuild() {
+    if (this.settings.indexOwner === 'external') {
+      if (this._rebuildInterval) { window.clearInterval(this._rebuildInterval); this._rebuildInterval = null; }
+      return;
+    }
     if (this._rebuildInterval) {
       window.clearInterval(this._rebuildInterval);
       this._rebuildInterval = null;
