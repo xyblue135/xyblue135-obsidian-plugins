@@ -87,9 +87,7 @@ cp data.example.json data.json
 
 本插件需要填的凭证字段：`apiKey`（AI 组织回答用；不填则退化为纯本地召回）
 
-> ⚠️ 填好 key 的 `data.json` 永远不要提交。
-> 提交前在 `.obsidian` 目录跑 `node tools/check-secrets.js`，
-> 扫到疑似密钥会返回非 0 并列出位置。
+> ⚠️ 填好 key 的 `data.json` 永远不要提交（`.gitignore` 已挡住）。
 
 ## 注意
 

@@ -8,6 +8,8 @@
  *   引用是仓库根路径（![](00_assets/<笔记名>/xx.png)），因此跨文件夹移动笔记不需要迁移附件。
  *   移动只调用 fileManager.renameFile，不改文件名，全库链接由 Obsidian 自动更新。
  * v1.0.0：初版。命令 + 右键菜单 + 丝带入口；Modal 内支持模糊搜索手动兜底。
+ * v1.0.3：AI 接口字段改名 aiBaseUrl/aiApiKey/aiModel → baseUrl/apiKey/model，
+ *         与库内其它 AI 插件统一；加载时自动迁移旧 data.json。
  */
 
 'use strict';
@@ -18,11 +20,12 @@ const DEFAULT_SETTINGS = {
 	notesRoot: 'my_blog/00_docs',
 	assetsRoot: 'my_blog/00_assets',
 	aiEnabled: true,
-	aiBaseUrl: 'http://127.0.0.1:31415/v1',
-	// 密钥不写进源码：真实值放在 data.json（与本库其它 AI 插件一致），
-	// 这样拷贝/发布 main.js 不会连带泄露 key。
-	aiApiKey: '',
-	aiModel: 'auto',
+	// 以下三个字段名与库内其它 AI 插件（ai-search / interview-rag /
+	// metadata-ai / skill-miner）保持一致：baseUrl / apiKey / model。
+	baseUrl: 'http://127.0.0.1:31415/v1',
+	// 密钥不写进源码：真实值放在 data.json，这样拷贝/发布 main.js 不会连带泄露 key。
+	apiKey: '',
+	model: 'auto',
 	requestTimeoutSeconds: 90,
 	maxSuggestions: 3,
 	profileTagLimit: 6,
@@ -77,7 +80,23 @@ function dice(a, b) {
 
 class DocsArchiverPlugin extends obsidian.Plugin {
 	async onload() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const raw = (await this.loadData()) || {};
+		// 兼容旧字段名：aiBaseUrl / aiApiKey / aiModel → baseUrl / apiKey / model
+		// （1.0.3 之前写下的 data.json 里是 ai* 系列，迁移后立刻回写，避免两套键并存）
+		let migrated = false;
+		for (const [oldKey, newKey] of [
+			['aiBaseUrl', 'baseUrl'],
+			['aiApiKey', 'apiKey'],
+			['aiModel', 'model']
+		]) {
+			if (Object.prototype.hasOwnProperty.call(raw, oldKey)) {
+				if (raw[newKey] === undefined || raw[newKey] === '') raw[newKey] = raw[oldKey];
+				delete raw[oldKey];
+				migrated = true;
+			}
+		}
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, raw);
+		if (migrated) await this.saveData(this.settings);
 
 		this.addCommand({
 			id: 'archive-current-note',
@@ -211,7 +230,7 @@ class DocsArchiverPlugin extends obsidian.Plugin {
 	/* AI 推荐：本地网关 /chat/completions，结构化 JSON 输出 */
 	async aiSuggestions(file, index, limit) {
 		if (!this.settings.aiEnabled) throw new Error('AI 推荐已在设置中关闭');
-		if (!String(this.settings.aiApiKey || '').trim()) {
+		if (!String(this.settings.apiKey || '').trim()) {
 			throw new Error('未填写 API Key（设置 → 文档归档推荐 → AI 接口）');
 		}
 		const cache = this.app.metadataCache.getFileCache(file);
@@ -252,16 +271,16 @@ class DocsArchiverPlugin extends obsidian.Plugin {
 			.filter(Boolean)
 			.join('\n');
 
-		const url = this.settings.aiBaseUrl.replace(/\/+$/, '') + '/chat/completions';
+		const url = this.settings.baseUrl.replace(/\/+$/, '') + '/chat/completions';
 		const res = await obsidian.requestUrl({
 			url,
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				Authorization: 'Bearer ' + this.settings.aiApiKey
+				Authorization: 'Bearer ' + this.settings.apiKey
 			},
 			body: JSON.stringify({
-				model: this.settings.aiModel,
+				model: this.settings.model,
 				temperature: 0,
 				messages: [{ role: 'user', content: prompt }]
 			}),
@@ -530,22 +549,22 @@ class DocsArchiverSettingTab extends obsidian.PluginSettingTab {
 			);
 
 		new obsidian.Setting(containerEl)
-			.setName('AI 基础 URL')
-			.setDesc('例如 http://127.0.0.1:31415/v1（自动拼接 /chat/completions）')
+			.setName('基础 URL')
+			.setDesc('OpenAI 兼容接口，例如 http://127.0.0.1:31415/v1（自动拼接 /chat/completions）')
 			.addText((t) =>
-				t.setValue(this.plugin.settings.aiBaseUrl).onChange(async (v) => {
-					this.plugin.settings.aiBaseUrl = v.trim() || DEFAULT_SETTINGS.aiBaseUrl;
+				t.setValue(this.plugin.settings.baseUrl).onChange(async (v) => {
+					this.plugin.settings.baseUrl = v.trim() || DEFAULT_SETTINGS.baseUrl;
 					await this.plugin.saveSettings();
 				})
 			);
 
 		new obsidian.Setting(containerEl)
 			.setName('API Key')
-			.setDesc('本地网关的 freellmapi key')
+			.setDesc('本地网关的 key，字段名 apiKey（与库内其它 AI 插件一致）')
 			.addText((t) => {
 				t.inputEl.type = 'password';
-				t.setValue(this.plugin.settings.aiApiKey).onChange(async (v) => {
-					this.plugin.settings.aiApiKey = v.trim();
+				t.setValue(this.plugin.settings.apiKey).onChange(async (v) => {
+					this.plugin.settings.apiKey = v.trim();
 					await this.plugin.saveSettings();
 				});
 			});
@@ -554,8 +573,8 @@ class DocsArchiverSettingTab extends obsidian.PluginSettingTab {
 			.setName('模型')
 			.setDesc('网关侧的模型名（默认 auto）')
 			.addText((t) =>
-				t.setValue(this.plugin.settings.aiModel).onChange(async (v) => {
-					this.plugin.settings.aiModel = v.trim() || 'auto';
+				t.setValue(this.plugin.settings.model).onChange(async (v) => {
+					this.plugin.settings.model = v.trim() || 'auto';
 					await this.plugin.saveSettings();
 				})
 			);

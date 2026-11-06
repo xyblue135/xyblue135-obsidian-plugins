@@ -27,7 +27,7 @@
 */credentials.json
 
 # 万一有人把 example 抄坏了、把 key 填进了 example
-# （靠 tools/check-secrets.js 兜底检查，这条只是最后一道保险）
+# （提交前请自己过一眼 `git diff --cached 00_xyblue135-*/data.example.json`）
 */data.example.local.json
 
 # -------- 插件运行时产物（可重建 / 体积大）--------

@@ -16,7 +16,6 @@ xyblue135 的 Obsidian 插件合集（自研 17 个 + 打包的第三方 6 个�
 │   ├── plugins/             # ← 本仓库（仓库根）
 │   │   ├── 00_xyblue135-*/  # 自研插件（17 个）
 │   │   ├── <第三方插件>/     # 打包进来的社区插件（6 个）
-│   │   ├── tools/           # check-secrets.js：提交前扫密钥
 │   │   ├── .gitignore
 │   │   └── README.md        # 就是本文件
 │   ├── snippets/            # 个人 CSS 片段，不进任何仓库
@@ -37,7 +36,7 @@ xyblue135 的 Obsidian 插件合集（自研 17 个 + 打包的第三方 6 个�
 |---|---|---|
 | `00_xyblue135-ai-search` | 0.3.4 | 本地召回 + AI 精排两阶段检索白名单文章，支持语义向量召回、标签/深度过滤、流式 AI 问答与引用跳转 |
 | `00_xyblue135-char-count-updater` | 4.1.3 | 按白名单更新 `token_count` 字段，中英文分倍率粗略估算 |
-| `00_xyblue135-docs-archiver` | 1.0.2 | 为 `my_blog/00_docs` 下笔记推荐归档文件夹：AI 推荐为主，本地打分兜底；一键移动 |
+| `00_xyblue135-docs-archiver` | 1.0.3 | 为 `my_blog/00_docs` 下笔记推荐归档文件夹：AI 推荐为主，本地打分兜底；一键移动 |
 | `00_xyblue135-docs-logo` | 1.0.3 | 仅对白名单目录显示状态图标，支持文件夹 / Markdown / 自定义 SVG |
 | `00_xyblue135-docs-nav` | 0.3.2 | 五种交互视图浏览知识库：技能树、树状图、旭日图、矩形树图、标签星图（ECharts 内置） |
 | `00_xyblue135-docs-template` | 1.5.3 | 新建 .md 后自动审查白名单目录，只追加缺失的 frontmatter 字段 |
@@ -55,16 +54,26 @@ xyblue135 的 Obsidian 插件合集（自研 17 个 + 打包的第三方 6 个�
 
 ## 打包的第三方插件
 
-`editing-toolbar`、`file-explorer-note-count`、`lookout`、`obsidian-pandoc`、
-`recent-files-obsidian`、`unicode-search`
+社区插件放到本仓库里，是为了**换机时一次 clone 全恢复**，不用去插件市场逐个搜、逐个装。
+代码未做任何修改，版权归各自作者。升级时重新覆盖 `main.js` / `manifest.json` / `styles.css` 即可。
 
-版权归各自作者所有，仅作个人环境备份，未做修改。
+| 插件 | 版本 | 用途 | 为什么留在这 |
+|---|---|---|---|
+| `editing-toolbar` | 2.4.16 | 笔记顶部浮动工具栏（类 Word）：加粗、标题、表格、公式、代码块等一键插入 | 自定义了一套按钮顺序，重装会丢 |
+| `file-explorer-note-count` | 1.2.2 | 文件列表里每个文件夹旁显示笔记数 | 无配置，纯功能 |
+| `lookout` | 1.2.2 | 宽表格 / Mermaid 大图横向查看：滚轮或 Ctrl+滚轮平移缩放、一键适配画布、全屏打开 | 看知识库里的架构图、流程图离不开 |
+| `obsidian-pandoc` | 0.4.1 | 调本机 pandoc 导出 DOCX / ePub / PDF | 依赖本机已装 pandoc；仅桌面端 |
+| `recent-files-obsidian` | 1.7.9 | 按最近打开时间列文件，快速回到上次看到的位置 | 配置里 50 条历史，迁移后已修正路径 |
+| `unicode-search` | 0.7.1 | 搜索并插入 Unicode 字符（箭头、数学符号、框线等） | 写技术笔记常用 |
+
+> 各插件的 `data.json`（`editing-toolbar`、`recent-files-obsidian`、`unicode-search` 三个有）
+> 同样**不入库** —— 里面是个人界面配置。恢复后需要自己在设置里再调一次。
 
 ## 注意
 
-- **插件的 `data.json` 不在本仓库**（里面有明文 API Key，且属于个人配置）。
+- **插件的 `data.json` 不在本仓库**：自研插件的含明文 API Key，第三方插件的是个人界面配置，一并不入库。
 - `index.json`、`reports/`、`node_modules/` 等运行时产物、`*.bak` 备份均不跟踪。
-- 克隆本仓库到 `<vault>/.obsidian/plugins` 后，插件可以正常加载，但需要自行填一次 API Key。
+- 克隆本仓库到 `<vault>/.obsidian/plugins` 后，插件能正常加载；需要凭证的照 `data.example.json` 抄一份填上（见下节）。
 - `docs-logo` 的 `icons.json` / `whitelist.json` 不跟踪 —— 那是「某个库」的图标映射，换库就失效。
 
 ### 配置与密钥
@@ -88,25 +97,22 @@ cp data.example.json data.json
 可以当设置项速查表用；凭证字段一律空串。没写进模板的键也不影响加载 ——
 插件启动时会用默认值补齐。
 
-需要填凭证的插件（各自的 README 里都写了具体字段名）：
+需要填凭证的插件。**字段名已统一**：凡是「OpenAI 兼容接口」的凭证，一律叫
+`baseUrl` / `apiKey` / `model`，值填同一套（同一台本地网关，直接复制粘贴）：
 
-| 插件 | 字段 |
-|---|---|
-| `ai-search` | `apiKey` |
-| `docs-archiver` | `aiApiKey` |
-| `interview-rag` | `apiKey` |
-| `metadata-ai` | `settings.apiKey` |
-| `skill-miner` | `settings.apiKey`、`settings.searchApiKey` |
-| `job-lens` | 不单独存，复用 `skill-miner` 的配置 |
+| 插件 | 字段 | 说明 |
+|---|---|---|
+| `ai-search` | `baseUrl` `apiKey` `model` | |
+| `docs-archiver` | `baseUrl` `apiKey` `model` | 1.0.3 起统一，旧 `ai*` 键自动迁移 |
+| `interview-rag` | `baseUrl` `apiKey` `model` | |
+| `metadata-ai` | `settings.baseUrl` `settings.apiKey` `settings.model` | 整份配置包在 `settings` 下 |
+| `skill-miner` | `settings.baseUrl` `settings.apiKey` `settings.model` | 同上 |
+| `skill-miner`（可选） | `settings.searchApiKey` | **不是** LLM 的 key，是 Tavily 搜索的 key，用途不同，保留独立字段 |
+| `job-lens` | 不单独存 | 直接复用 `skill-miner` 的配置 |
 
-提交前想确认没手滑，在本仓库根跑：
-
-```bash
-node tools/check-secrets.js          # 只扫 git 跟踪的文件
-node tools/check-secrets.js --all    # 连未跟踪文件一起
-```
-
-扫到疑似密钥会打印文件:行号并返回非 0。
+> 为什么 `metadata-ai` / `skill-miner` 多一层 `settings.`：这两个插件把整个配置
+> 包在 `settings` 子对象里（含版本号、harness 提示词等上百个键），是它们的配置
+> 结构如此，不是命名不统一。**字段名本身仍是 `apiKey`**，不该为了整齐去动那一层。
 
 > 真要把 key 放出去过（比如曾经提交过），换 key 才算真解决 —— 从历史里删掉的对象
 > 在 GitHub 上还会残留一段时间，且任何拉过旧历史的人手里都有。

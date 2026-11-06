@@ -28,9 +28,9 @@
 | `notesRoot` | `my_blog/00_docs` | 要归档的笔记根目录 |
 | `assetsRoot` | `my_blog/00_assets` | 附件根目录（仅用于生成说明，不搬文件） |
 | `aiEnabled` | `true` | 关掉就只用本地打分 |
-| `aiBaseUrl` | `http://127.0.0.1:31415/v1` | OpenAI 兼容接口 |
-| `aiApiKey` | 空 | 存在 `data.json`，不在源码里 |
-| `aiModel` | `auto` | |
+| `baseUrl` | `http://127.0.0.1:31415/v1` | OpenAI 兼容接口 |
+| `apiKey` | 空 | 存在 `data.json`，不在源码里 |
+| `model` | `auto` | |
 | `requestTimeoutSeconds` | 90 | |
 | `maxSuggestions` | 3 | 弹窗里列几个候选 |
 | `profileTagLimit` | 6 | 喂给 AI 的笔记最多带几个标签 |
@@ -47,13 +47,17 @@ cp data.example.json data.json
 # 然后编辑 data.json，把下面这些字段填上
 ```
 
-本插件需要填的凭证字段：`aiApiKey` —— 注意字段名是 `aiApiKey`，不是 `apiKey`
+本插件需要填的凭证字段：`apiKey`。
+
+> 字段名与库内其它 AI 插件（`ai-search` / `interview-rag` / `metadata-ai` /
+> `skill-miner`）统一为 `baseUrl` / `apiKey` / `model`，五处填一样的值即可。
+>
+> **1.0.3 之前**用的是 `aiBaseUrl` / `aiApiKey` / `aiModel`。插件加载时会自动
+> 迁移旧键并回写 `data.json`，**不需要手动改**；本次升级已提前迁移完毕。
 
 > ⚠️ 填好 key 的 `data.json` 永远不要提交。
-> 提交前在 `.obsidian` 目录跑 `node tools/check-secrets.js`，
-> 扫到疑似密钥会返回非 0 并列出位置。
 
 ## 注意
 
 - 只处理 `notesRoot` 下的 Markdown，其他位置不接管。
-- `data.json` 含明文 `aiApiKey`，不进 git。
+- `data.json` 含明文 `apiKey`，不进 git。
