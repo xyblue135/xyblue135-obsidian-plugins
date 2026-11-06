@@ -1,0 +1,393 @@
+/* xyblue135 · 技能提炼 */
+
+.xysk-modal {
+  width: 820px;
+  max-width: 94vw;
+}
+
+.xysk-modal .modal-content {
+  max-height: 76vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+}
+
+.xysk-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.xysk-title {
+  font-size: 16px;
+  font-weight: 700;
+  flex: 1 1 auto;
+}
+
+.xysk-stats {
+  color: var(--text-muted);
+  font-size: 12px;
+  flex: 1 1 100%;
+}
+
+.xysk-section {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.xysk-section-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.xysk-section-title .xysk-hint {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.xysk-positioning {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.xysk-bullet {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.xysk-bullet input[type="checkbox"] {
+  margin: 3px 0 0 0;
+  flex: 0 0 auto;
+}
+
+.xysk-bullet-text {
+  flex: 1 1 auto;
+}
+
+.xysk-bullet-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.xysk-evidence {
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 11px;
+  flex: 0 0 auto;
+}
+
+.xysk-evidence:hover {
+  color: var(--interactive-accent);
+}
+
+.xysk-cluster-table {
+  width: 100%;
+  font-size: 12px;
+  border-collapse: collapse;
+}
+
+.xysk-cluster-table th,
+.xysk-cluster-table td {
+  text-align: left;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.xysk-cluster-table th {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.xysk-level-精通 {
+  color: var(--text-success);
+  font-weight: 600;
+}
+
+.xysk-level-熟练 {
+  color: var(--text-accent);
+  font-weight: 600;
+}
+
+.xysk-level-了解 {
+  color: var(--text-muted);
+}
+
+.xysk-level-兴趣,
+.xysk-level-工具,
+.xysk-level-环境 {
+  color: var(--text-faint);
+}
+
+.xysk-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-family: var(--font-monospace);
+  line-height: 1.7;
+}
+
+.xysk-bar-month {
+  color: var(--text-muted);
+  flex: 0 0 64px;
+}
+
+.xysk-bar-fill {
+  color: var(--interactive-accent);
+  white-space: pre;
+}
+
+.xysk-bar-count {
+  color: var(--text-muted);
+}
+
+.xysk-textarea {
+  width: 100%;
+  min-height: 90px;
+  font-size: 12px;
+}
+
+.xysk-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.xysk-status {
+  color: var(--text-muted);
+  font-size: 12px;
+  flex: 1 1 100%;
+}
+
+.xysk-interview-q {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.xysk-interview-answer {
+  width: 100%;
+  min-height: 120px;
+  font-size: 13px;
+}
+
+.xysk-grade {
+  border-top: 1px solid var(--background-modifier-border);
+  margin-top: 8px;
+  padding-top: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.xysk-grade-score {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-accent);
+  margin-right: 8px;
+}
+
+.xysk-grade-section {
+  margin-top: 4px;
+}
+
+.xysk-grade-label {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.xysk-source {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+.xysk-source a {
+  color: var(--text-accent);
+  cursor: pointer;
+}
+
+.xysk-history {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.xysk-history .good { color: var(--text-success); }
+.xysk-history .mid { color: var(--text-accent); }
+.xysk-history .bad { color: var(--text-error); }
+
+/* ---------- v0.5：Tab / 树 / 卡片 / 优先级 ---------- */
+
+.xysk-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.xysk-tab {
+  font-size: 12px;
+  padding: 3px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--background-modifier-border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.xysk-tab.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.xysk-tabbody {
+  min-height: 320px;
+}
+
+.xysk-chart {
+  color: var(--text-normal);
+}
+
+.xysk-chart .xysk-section-title {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.xysk-tree {
+  margin-bottom: 10px;
+}
+
+.xysk-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.xysk-tree-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.xysk-tree-row .xysk-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.xysk-tree-child {
+  margin-left: 22px;
+}
+
+/* 展开后的证据文章列表：条数不限，由容器自己滚动 */
+.xysk-tree-docs {
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0 0 4px 44px;
+  padding-left: 6px;
+  border-left: 1px solid var(--background-modifier-border);
+}
+
+.xysk-card-docs {
+  max-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.xysk-tree-doc {
+  margin-left: 44px;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 1px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.xysk-tree-docs .xysk-tree-doc {
+  margin-left: 0;
+}
+
+.xysk-tree-doc:hover {
+  color: var(--text-accent);
+  background: var(--background-modifier-hover);
+}
+
+.xysk-emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.xysk-trackcard {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.xysk-trackcard h4 {
+  margin: 0 0 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.xysk-status-chip {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.xysk-hotbar {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.xysk-hotbar i {
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--background-modifier-border);
+}
+
+.xysk-hotbar i.on {
+  background: var(--interactive-accent);
+}
+
+.xysk-chip-p {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.xysk-pri-P0 { background: #c9553d; color: #fff; }
+.xysk-pri-P1 { background: #d99a3d; color: #222; }
+.xysk-pri-P2 { background: #7f8fa6; color: #fff; }

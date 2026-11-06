@@ -1,0 +1,9 @@
+{
+  "id": "00_xyblue135-docs-nav",
+  "name": "xyblue135 · 知识库导航",
+  "version": "0.3.1",
+  "minAppVersion": "1.5.0",
+  "description": "【xyblue135 开源插件】五种交互视图浏览知识库：技能树（与技能提炼同口径，读取其 AI 定级与方向修正）、树状图、旭日图、矩形树图、标签星图；点击节点查看元数据并直接打开笔记。ECharts 已内置本地，无需联网。",
+  "author": "xyblue135",
+  "isDesktopOnly": false
+}

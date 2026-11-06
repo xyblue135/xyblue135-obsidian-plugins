@@ -1,0 +1,9 @@
+{
+  "id": "00_xyblue135-launcher",
+  "name": "xyblue135 · 启动台",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "【xyblue135 开源插件】Raycast 式插件启动台：侧栏高亮图标或快捷键唤起居中浮层，搜索即达，卡片网格一行 4 个——自研插件点击直达主功能，全部插件可进设置。纯入口面板，不操控侧边栏。",
+  "author": "xyblue135",
+  "isDesktopOnly": true
+}

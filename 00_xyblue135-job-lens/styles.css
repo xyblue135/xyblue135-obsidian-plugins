@@ -1,0 +1,17 @@
+/* xyblue135 · 岗位透镜 */
+.xyjl-hint { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+.xyjl-btns { display: flex; gap: 8px; margin-top: 12px; }
+.xyjl-btn { font-size: 13px; }
+.xyjl-btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--background-modifier-border); box-shadow: none; }
+
+/* 面板视图 */
+.xyjl-view { display: flex; flex-direction: column; height: 100%; padding: 6px 2px; }
+.xyjl-viewbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.xyjl-viewtitle { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xyjl-viewactions { display: flex; gap: 6px; flex-shrink: 0; }
+.xyjl-viewbody { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+.xyjl-history { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
+.xyjl-histbtn { font-size: 11px; padding: 1px 8px; border-radius: 8px; border: 1px solid var(--background-modifier-border); background: transparent; color: var(--text-muted); cursor: var(--cursor, pointer); }
+.xyjl-histbtn.is-active { background: var(--interactive-accent); color: var(--text-on-accent); border-color: transparent; }
+.xyjl-md { font-size: 13.5px; }
+.xyjl-md h2 { margin-top: 18px; }

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>吕世轩 · 简历（AI 生成 · 版式 D GitHub 风格）</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","Noto Sans SC",sans-serif;
+         background:#ffffff; color:#24292f; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .page { width:210mm; min-height:297mm; margin:0 auto; background:#ffffff; }
+
+  .topbar { height:9mm; background:#24292f; color:#e6edf3; display:flex; align-items:center; gap:3mm;
+            padding:0 15mm; font-size:7.4pt; }
+  .topbar svg { color:#fff; }
+  .topbar .brand { font-weight:700; letter-spacing:.3px; }
+  .topbar .crumb { color:#8b949e; }
+  .topbar .search { margin-left:auto; width:52mm; border:1px solid #57606a; border-radius:1.2mm;
+                    padding:1.1mm 2mm; color:#8b949e; font-size:7pt; display:flex; align-items:center; gap:1.5mm; }
+
+  .profile { background:#fff; border-bottom:1px solid #d0d7de; padding:6.5mm 15mm 0; }
+  .profile-top { display:flex; align-items:flex-start; gap:6mm; }
+  .avatar { width:22mm; height:22mm; border-radius:50%; object-fit:cover; border:1px solid #d0d7de; flex:0 0 22mm; }
+  .who { flex:1; }
+  .name-row { display:flex; align-items:center; gap:3mm; }
+  .name-row h1 { margin:0; font-size:20pt; line-height:1.15; letter-spacing:.5px; color:#24292f; font-weight:400; }
+  .handle { font-size:9.2pt; color:#57606a; }
+  .bio { margin:2mm 0 0; font-size:9.2pt; line-height:1.55; color:#57606a; }
+  .meta { margin-top:2.5mm; display:flex; flex-wrap:wrap; gap:1.6mm 5mm; font-size:8pt; color:#57606a; }
+  .meta span { display:inline-flex; align-items:center; gap:1.2mm; }
+  .meta svg { color:#57606a; }
+  .meta a { color:#0969da; text-decoration:none; }
+  .verify { font-size:7.6pt; color:#57606a; border:1px solid #d0d7de; border-radius:2mm; padding:.6mm 2mm; }
+  .follow { flex:0 0 auto; margin-top:1mm; background:#2da44e; border:1px solid rgba(31,35,40,.15); color:#fff;
+            border-radius:1.5mm; padding:1.3mm 4mm; font-size:8pt; font-weight:600; text-decoration:none; }
+
+  .tabs { display:flex; gap:6mm; margin-top:4.5mm; font-size:8.8pt; color:#24292f; }
+  .tab { padding:0 0 2.4mm; border-bottom:2px solid transparent; display:flex; align-items:center; gap:1.4mm; }
+  .tab.active { border-bottom-color:#fd8c73; font-weight:600; }
+  .tab .count { background:#eff1f3; border-radius:999px; padding:0 1.6mm; font-size:7pt; color:#57606a; }
+
+  .body { padding:4.5mm 15mm 7mm; position:relative; }
+  .main { margin-right:66mm; min-width:0; }
+  .aside { position:absolute; top:4.5mm; right:15mm; width:60mm; }
+
+  .card { background:#fff; border:1px solid #d0d7de; border-radius:1.6mm; overflow:hidden; }
+  .card-head { display:flex; align-items:center; gap:1.6mm; padding:2.4mm 3.5mm; border-bottom:1px solid #d0d7de;
+               font-size:8.4pt; color:#57606a; background:#ffffff; }
+  .card-head svg { color:#57606a; }
+  .card-head b { color:#24292f; font-weight:600; }
+
+  .markdown { padding:4.5mm 5mm 3mm; }
+  .markdown h3 { margin:3.8mm 0 2.2mm; padding-bottom:1.2mm; border-bottom:1px solid #d8dee4;
+                 font-size:10.8pt; font-weight:600; color:#24292f; }
+  .markdown h3:first-child { margin-top:0; }
+  blockquote { margin:0 0 2.4mm; padding:0 0 0 3mm; border-left:.8mm solid #d0d7de; color:#57606a;
+               font-size:9pt; line-height:1.58; }
+  .markdown p { margin:0 0 2mm; font-size:9pt; line-height:1.58; color:#24292f; }
+  .entry { margin-bottom:3mm; }
+  .entry-head { display:flex; justify-content:space-between; align-items:baseline; gap:3mm; margin-bottom:1mm; }
+  .entry-head strong { font-size:9.6pt; }
+  .entry-head span { font-size:8pt; color:#57606a; white-space:nowrap; }
+  .markdown ul { margin:0; padding-left:4.5mm; }
+  .markdown li { margin-bottom:.6mm; font-size:8.8pt; line-height:1.56; }
+  .markdown li::marker { color:#57606a; }
+  code { font-family:ui-monospace,Consolas,"Courier New",monospace; font-size:7.8pt; padding:.2mm 1mm;
+         background:rgba(175,184,193,.2); border-radius:1mm; }
+
+  .proj { margin-bottom:1.8mm; }
+  .proj b { font-size:9.2pt; }
+  .proj p { margin:.4mm 0 0; font-size:8.8pt; line-height:1.5; color:#57606a; }
+  .kw { display:flex; flex-wrap:wrap; gap:1mm; margin-top:2.5mm; }
+  .kw span { font-size:7.6pt; padding:.8mm 1.8mm; border:1px solid #d0d7de; border-radius:999px; color:#0969da;
+             background:#ffffff; }
+
+  .repo { padding:2.8mm 3.5mm; border-bottom:1px solid #d8dee4; }
+  .repo:last-child { border-bottom:none; }
+  .repo-name { display:flex; align-items:center; gap:1.4mm; font-size:8.6pt; font-weight:600; color:#0969da; }
+  .repo-name a { color:#0969da; text-decoration:none; }
+  .repo-name svg { color:#57606a; flex:0 0 auto; }
+  .repo-name .pub { margin-left:auto; font-size:6.8pt; font-weight:400; color:#57606a; border:1px solid #d0d7de;
+                    border-radius:999px; padding:.2mm 1.5mm; }
+  .repo p { margin:1mm 0 0; font-size:7.9pt; line-height:1.5; color:#57606a; }
+  .repo-meta { margin-top:1mm; font-size:7pt; color:#57606a; display:flex; align-items:center; gap:1.2mm; }
+  .dot { width:2mm; height:2mm; border-radius:50%; display:inline-block; }
+
+  .lang-bar { display:flex; height:1.8mm; border-radius:999px; overflow:hidden; margin:1mm 0 2mm; }
+  .lang-bar i { display:block; height:100%; }
+  .legend { display:flex; flex-wrap:wrap; gap:1mm 3mm; font-size:7pt; color:#57606a; }
+  .legend b { font-weight:400; color:#57606a; }
+  .side-note { font-size:6.4pt; color:#8b949e; margin-top:1.4mm; }
+  @media print { body { background:#fff; } .page { margin:0; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topbar">
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    <span class="brand">GitHub</span>
+    <span class="crumb">/ {{GITHUB_USER}} / README.md</span>
+    <div class="search">
+      <svg viewBox="0 0 16 16" width="9" height="9" aria-hidden="true"><path fill="currentColor" d="M10.68 11.74a6 6 0 01-7.922-8.982 6 6 0 018.982 7.922l3.04 3.04a.749.749 0 01-.326 1.275.749.749 0 01-.734-.215l-3.04-3.04zM11.5 7a4.5 4.5 0 10-9 0 4.5 4.5 0 009 0z"/></svg>
+      Search or jump to…
+    </div>
+  </div>
+
+  <header class="profile">
+    <div class="profile-top">
+      <img class="avatar" src="{{AVATAR}}" alt="{{NAME}}">
+      <div class="who">
+        <div class="name-row">
+          <h1>{{NAME}}</h1>
+          <span class="handle">{{HANDLE}}</span>
+          <span class="verify">{{DEGREE}}</span>
+        </div>
+        <p class="bio">{{BIO}}</p>
+        <div class="meta">{{META}}</div>
+      </div>
+      <a class="follow" href="{{GITHUB_URL}}">Follow</a>
+    </div>
+    <nav class="tabs">
+      <span class="tab active">Overview</span>
+      <span class="tab">Repositories</span>
+      <span class="tab">Projects</span>
+      <span class="tab">Stars</span>
+    </nav>
+  </header>
+
+  <div class="body">
+    <main class="main">
+      <div class="card">
+        <div class="card-head">
+          <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M0 1.75A.75.75 0 01.75 1h4.253c1.227 0 2.317.59 3 1.501A3.742 3.742 0 0111.006 1h4.245a.75.75 0 01.75.75v10.5a.75.75 0 01-.75.75h-4.507a2.25 2.25 0 00-1.591.659l-.622.621a.75.75 0 01-1.06 0l-.622-.621A2.25 2.25 0 005.258 13H.75a.75.75 0 01-.75-.75V1.75zm7.25 1.5A2.25 2.25 0 005 1h-3.5v9.5h3.75c.595 0 1.17.116 1.7.332V3.25zm1.5 7.582a3.72 3.72 0 011.7-.332h3.8V1h-3.75A2.25 2.25 0 008.75 3.25v7.582z"/></svg>
+          <b>README.md</b>
+          <span style="margin-left:auto">Preview</span>
+        </div>
+        <div class="markdown">
+{{MAIN}}
+
+        </div>
+      </div>
+    </main>
+
+    <aside class="aside">
+      <div class="card">
+        <div class="card-head"><svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path fill="currentColor" d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 010-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1h-8a1 1 0 00-1 1v6.708A2.486 2.486 0 014.5 9h8V1.5z"/></svg><b>Popular repositories</b></div>
+        {{REPOS}}<div class="card" style="margin-top:4mm">
+        <div class="card-head"><b>技术侧重</b><span style="margin-left:auto;font-size:6.4pt;color:#8b949e">示意</span></div>
+        <div style="padding:3mm 3.5mm">{{LANG}}</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:4mm">
+        <div class="card-head"><b>教育背景</b></div>
+        <div style="padding:2.8mm 3.5mm;font-size:7.8pt;line-height:1.6;color:#57606a">{{EDU}}</div>
+    {{NEXT_GUIDE}}
+    </aside>
+  </div>
+</div>
+</body>
+</html>

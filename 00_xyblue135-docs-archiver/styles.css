@@ -1,0 +1,85 @@
+/* xyblue135 私人 · 文档归档推荐 */
+
+.docs-archiver-modal .docs-archiver-title {
+	font-weight: 600;
+	font-size: 1.05em;
+	margin-bottom: 4px;
+}
+
+.docs-archiver-modal .docs-archiver-sub {
+	color: var(--text-muted);
+	font-size: 0.85em;
+	margin-bottom: 10px;
+}
+
+.docs-archiver-modal .docs-archiver-input {
+	width: 100%;
+	margin-bottom: 8px;
+}
+
+.docs-archiver-modal .docs-archiver-list {
+	max-height: 340px;
+	overflow-y: auto;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+}
+
+.docs-archiver-modal .docs-archiver-label {
+	padding: 6px 10px;
+	font-size: 0.8em;
+	color: var(--text-muted);
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+}
+
+.docs-archiver-modal .docs-archiver-item {
+	padding: 8px 10px;
+	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.docs-archiver-modal .docs-archiver-item:last-child {
+	border-bottom: none;
+}
+
+.docs-archiver-modal .docs-archiver-item.is-active {
+	background: var(--background-modifier-hover);
+}
+
+.docs-archiver-modal .docs-archiver-item-path {
+	font-weight: 500;
+	word-break: break-all;
+}
+
+.docs-archiver-modal .docs-archiver-item-meta {
+	font-size: 0.85em;
+	color: var(--text-muted);
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.docs-archiver-modal .docs-archiver-badge {
+	font-size: 0.75em;
+	line-height: 1.4;
+	padding: 0 6px;
+	border-radius: 8px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	color: var(--text-normal);
+}
+
+.docs-archiver-modal .docs-archiver-empty {
+	padding: 12px 10px;
+	color: var(--text-muted);
+	font-size: 0.9em;
+}
+
+.docs-archiver-modal .docs-archiver-hint {
+	margin-top: 8px;
+	color: var(--text-faint);
+	font-size: 0.8em;
+}

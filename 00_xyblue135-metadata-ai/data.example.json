@@ -1,0 +1,17 @@
+{
+  "settings": {
+    "baseUrl": "http://127.0.0.1:3001/v1",
+    "apiKey": "",
+    "model": "auto",
+    "whitelistFolder": "00_docs",
+    "summaryShortMaxChars": 100,
+    "summaryLongMaxChars": 300,
+    "contentFingerprintEnabled": false,
+    "autoUpdateEnabled": false,
+    "experimentalCombinedRequestEnabled": true,
+    "technicalDepthHarnessEnabled": true
+  },
+  "state": {
+    "files": {}
+  }
+}

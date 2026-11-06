@@ -1,0 +1,35 @@
+/* xyblue135 · 面试检索 — 测试弹窗样式 */
+
+.xivr-modal .xivr-input {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.xivr-modal .xivr-hint {
+  color: var(--text-faint);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.xivr-modal .xivr-result {
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.xivr-modal .xivr-result .xivr-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.xivr-modal .xivr-result .xivr-error {
+  color: var(--text-error);
+}
+
+.xivr-modal .xivr-result .xivr-src {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}

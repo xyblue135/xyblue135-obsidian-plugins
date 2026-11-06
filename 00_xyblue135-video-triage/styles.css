@@ -1,0 +1,5 @@
+/* xyblue135 · 视频分诊 */
+.xyt-hint { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+.xyt-btns { display: flex; gap: 8px; margin-top: 12px; }
+.xyt-btn { font-size: 13px; }
+.xyt-btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--background-modifier-border); box-shadow: none; }
