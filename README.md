@@ -91,7 +91,7 @@ xyblue135 的 Obsidian 插件合集（自研 13 个 + 打包的第三方 6 个�
 界面上有「重建检索索引」按钮，但点了之后只能看状态栏，出问题看不到原因。
 
 配套的独立程序 `xyindex` 就是为了这个（**不在本仓库**，在
-`D:\2document\00_github_private\xyblue-index`，只要 Node ≥ 18，零依赖）：
+`D:\2document\obsidian_data\ai_index`，只要 Node ≥ 18，零依赖）：
 
 ```bash
 xyindex config vault "D:\2document\obsidian_data"   # 设一次默认 vault

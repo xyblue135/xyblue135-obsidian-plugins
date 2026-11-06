@@ -4,7 +4,7 @@
 功能已经全部合并进独立程序 **`xyindex`**：
 
 ```
-D:\2document\00_github_private\xyblue-index
+D:\2document\obsidian_data\ai_index
 ```
 
 用法见插件 README 的「索引」章节，或 `xyindex --help`。

@@ -105,7 +105,7 @@ answer.json = {"id": <同 id>, "answer": "...", "sources": [{"path", "title"}]}
 **③ 命令行程序 xyindex（推荐）**
 
 配套的独立程序，不打开 Obsidian 就能重建，并给出可以直接判读的数字。
-路径 `D:\2document\00_github_private\xyblue-index`，只要 Node ≥ 18，零依赖。
+路径 `D:\2document\obsidian_data\ai_index`，只要 Node ≥ 18，零依赖。
 
 ```bash
 xyindex config vault "D:\2document\obsidian_data"   # 设一次默认 vault
