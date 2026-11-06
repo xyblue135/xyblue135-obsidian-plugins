@@ -7,6 +7,9 @@
  *           + AI 精排（chat/completions，与 00_xyblue135-metadata-ai 同一套接口约定）
  * 可选流式 AI 问答（RAG）：取精排前列文章的相关段落作为资料，回答带 [n] 引用。
  *
+ * 1.0.0 起并入原 00_xyblue135-interview-rag：面试模式复用同一份索引与同一个 baseUrl/apiKey，
+ * 以 iv* 前缀的设置独立控制评分权重/模型/超时，并保留 ragfile 文件握手（query.json / answer.json）。
+ *
  * HTTP 走 Node 原生 http/https（与 metadata-ai 相同），无 CORS 限制，支持 SSE 流式。
  */
 
@@ -16,6 +19,9 @@ const {
 } = require('obsidian');
 const http = require('http');
 const https = require('https');
+// 面试模式的 ragfile 桥接走本地文件（与 OBS 侧 bridge.py 的握手契约，不能用网络端口）
+const fs = require('fs');
+const path = require('path');
 
 /* ============================ 常量与默认配置 ============================ */
 
@@ -44,6 +50,57 @@ const RERANK_FORMAT_SPEC = [
   '{"results":[{"path":"候选列表中的 path 原文","score":0到100的整数,"reason":"不超过30字的相关理由"}]}',
   '按相关度从高到低排序，最多返回 10 条；path 必须逐字复制候选列表中的 path 字段，禁止修改或编造。',
 ].join('\n');
+
+/* ==================== 面试模式常量（1.0.0 由原 00_xyblue135-interview-rag 并入） ==================== */
+
+const DEFAULT_IV_AI_PROMPT = [
+  '角色：面试实时知识库助手。',
+  '任务：面试官刚提出一个问题，根据提供的知识库资料，给出可以立即口头使用的回答。',
+  '要求：',
+  '1. 只依据资料，禁止编造；资料不足时明确说明“资料中未找到相关内容”；',
+  '2. 中文，3-5 条要点，每条一行，重点先行，总共不超过 300 字；',
+  '3. 纯文本输出：不要 Markdown 标记、不要标题符号、不要 [n] 引用编号。',
+].join('\n');
+
+/**
+ * 「AI 协助」模式下追加在用户提示词后面的补充规则。
+ * 动机：本地召回是按字面加权，问「redis 故障怎么处理」常常只召回同名笔记（内容是安装/命令），
+ * 严格「只用资料」等于逼模型答非所问或干脆弃答。面试场景宁可给通用工程要点，也要标注来源性质。
+ */
+const IV_ASSIST_HINT = [
+  '补充规则（下面的召回资料可能只与问题字面相关）：',
+  '1. 资料里有相关的事实、命令或项目经历就优先用，并说清依据哪件事；',
+  '2. 资料与问题无关就整段忽略，不要硬套里面的命令、参数或结论；',
+  '3. 问题问「你做过什么 / 用过哪些 / 有哪些经验」时，先从资料里找具体项目实例，用第一人称讲；',
+  '4. 资料确实覆盖不到，就直接用通用工程经验回答，宁可给通用要点也不要拒答；',
+  '5. 不要写「资料中未找到相关内容」这类开场说明；确实主要靠通用经验时，只在第一行写一次「（资料未覆盖，以下为通用经验）」，不要重复解释。',
+].join('\n');
+
+/**
+ * 直答模式的系统提示词：让 AI 以第一人称口语代替候选人回答，
+ * 悬浮卡上直接是「能照着说的话」，而不是要点列表。
+ */
+const DEFAULT_IV_SPOKEN_PROMPT = [
+  '角色：你就是正在面试的候选人本人，第一人称作答。',
+  '任务：面试官刚向你提了一个问题，直接用你自己的口吻回答，让用户可以照着说。',
+  '要求：',
+  '1. 像真人说话：自然连贯的口语，允许「其实」「简单来说」这类口头语；',
+  '2. 禁止分点列表和「首先/其次」式书面结构，禁止 Markdown 符号、禁止 [n] 引用编号；',
+  '3. 资料里的事实、命令、项目经历自然融进回答；资料没覆盖的细节不要编造具体数字，用工程常识圆过去；',
+  '4. 先给结论再展开，总共 3~5 句、150 字以内，像 30~45 秒的口头回答；',
+  '5. 说完自然收住，不要「以上就是我的回答」这类套话。',
+].join('\n');
+
+/**
+ * 疑问/礼貌类词：对召回没有区分度，却会把「怎么处理」「如何配置」这类无关文档顶上来。
+ * 只用于查询侧过滤，不影响建索引时的分词（正文该有的词一个都不能少）。
+ */
+const QUERY_STOPWORDS = [
+  '怎么', '怎样', '如何', '为什', '什么', '哪些', '哪个', '是否', '能否', '可否',
+  '请问', '介绍', '一下', '说说', '讲讲', '谈谈', '区别', '以及', '可以', '需要',
+  '我们', '你们', '这个', '那个', '就是', '然后', '还有', '那么', '做过',
+  '处理', '简单', '一般', '具体', '详细',
+];
 
 const DEFAULT_SETTINGS = {
   baseUrl: 'http://127.0.0.1:31415/v1',
@@ -75,6 +132,57 @@ const DEFAULT_SETTINGS = {
 
   rerankHarness: DEFAULT_RERANK_HARNESS,
   qaHarness: DEFAULT_QA_HARNESS,
+
+  /* ---- 面试模式（1.0.0 由原 00_xyblue135-interview-rag 并入，统一 iv 前缀）----
+     与主检索共用同一份索引与 baseUrl/apiKey，但模型、超时、评分权重独立 ——
+     面试要「毫秒级 + 字面准」，与日常检索的取舍不同。 */
+
+  // 监听与桥接（OBS 转写 → bridge.py → query.json / answer.json）
+  ivBridgeEnabled: true,
+  ivRagDir: 'D:\\obs-interview\\rag',
+  ivPollMs: 300,
+  ivAnswerDeadlineMs: 12000,
+
+  // 召回
+  ivRecallLimit: 50,
+  ivMaxSources: 4,
+  ivMinScore: 6,
+
+  // 评分权重（与合并前的 6 / 1 / 25 / 12 默认值一致）
+  ivWStrong: 6,
+  ivWBody: 1,
+  ivPhraseBonusStrong: 25,
+  ivPhraseBonusBody: 12,
+  ivHotwordBoost: 8,
+  ivHotwordsFile: 'D:\\obs-interview\\hotwords.txt',
+
+  // 回答组装（本地要点）
+  ivSnippetRadius: 60,
+  ivAnswerTitle: '知识库要点',
+  ivMaxAnswerChars: 600,
+  ivShowSourcePaths: false,
+
+  // 问题清洗
+  ivMinQuestionChars: 4,
+  ivNoiseRegex: '',
+
+  // AI 精答
+  ivAiEnabled: true,
+  ivModel: 'auto',
+  ivTimeoutMs: 10000,
+  ivMaxTokens: 0,
+  ivContextDocs: 5,
+  ivContextCharsPerDoc: 1000,
+  // 命名与旧插件的 aiAssist / aiFallbackLocal / aiSystemPrompt 一一对应，
+  // 迁移时只需 'iv' + 首字母大写，不必维护例外表
+  ivAiAssist: true,
+  ivAiFallbackLocal: true,
+  ivAiSystemPrompt: DEFAULT_IV_AI_PROMPT,
+
+  // 直答模式
+  ivSpokenEnabled: false,
+  ivSpokenSystemPrompt: DEFAULT_IV_SPOKEN_PROMPT,
+  ivSpokenPromptPresets: null,
 };
 
 const INDEX_VERSION = 1;
@@ -118,6 +226,39 @@ function countOccurrences(hay, needle) {
   return n;
 }
 
+/**
+ * 查询侧分词（面试模式用）：先把疑问/礼貌词从原串里「挖掉」再切二元组。
+ * 动机：直接 tokenize 会把「故障怎么处理」切成 故障/障怎/怎么/么处/处理，
+ * 其中「障怎」「么处」这类跨词碎片 df 极低、idf 反而最高，最容易把无关笔记顶上来；
+ * 而「怎么/处理」本身没有区分度，会把「怎么配置」类文章全部拉进来。
+ * 兜底：过滤后一个词都不剩就退回原始分词，避免短问题直接查空。
+ */
+function queryTerms(text) {
+  const s = String(text || '').toLowerCase();
+  const out = [];
+  const push = (t) => { if (t && !out.includes(t)) out.push(t); };
+  for (const w of s.match(/[a-z0-9_+#.\-]{2,}/g) || []) push(w);
+  let masked = s;
+  for (const w of QUERY_STOPWORDS) {
+    if (masked.includes(w)) masked = masked.split(w).join('\n');
+  }
+  for (const run of masked.match(/[\u4e00-\u9fff\u3040-\u30ff]{2,}/g) || []) {
+    if (run.length <= 4) push(run);
+    for (let i = 0; i < run.length - 1; i++) push(run.slice(i, i + 2));
+  }
+  return out.length ? out : tokenize(text);
+}
+
+/** 用户填的噪声正则可能写错，单行失败只跳过该行，不能让整个应答链挂掉。 */
+function safeRegExp(src) {
+  try {
+    return new RegExp(src);
+  } catch (e) {
+    console.warn('[AI 检索] 无效正则，已跳过:', src);
+    return null;
+  }
+}
+
 /** FNV-1a 32 位哈希，用于文件内容变更检测。 */
 function fnv1a(str) {
   let h = 0x811c9dc5;
@@ -147,10 +288,23 @@ function highlight(frag, terms) {
   return out;
 }
 
-/** 在段落中围绕首个命中词取一段摘要。 */
-function makeSnippet(section, terms, radius = 70) {
+/** 摘要净化：链接只留文字、去掉表格/代码/加粗符号（面试卡片要能直接照着念）。 */
+function sanitizeSnippet(t) {
+  return String(t)
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[|`*_>#]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * 在段落中围绕首个命中词取一段摘要。
+ * plain=true 时先净化 Markdown 标记——面试回答是给人念的，不能带 `|` 和反引号；
+ * 检索面板保持原样（它自己做高亮渲染，净化会吃掉行内代码的视觉区分）。
+ */
+function makeSnippet(section, terms, radius = 70, plain = false) {
   if (!section || !section.t) return '';
-  const t = section.t.replace(/\s+/g, ' ');
+  const t = plain ? sanitizeSnippet(section.t) : section.t.replace(/\s+/g, ' ');
   const tl = t.toLowerCase();
   let pos = -1;
   for (const term of terms || []) {
@@ -584,17 +738,43 @@ class SearchIndex {
     }, 1500);
   }
 
-  bestSection(doc, terms) {
+  /** 命中段落挑选。headerWeight>0 时标题命中额外加权（面试模式用 3，与合并前一致）。 */
+  bestSection(doc, terms, headerWeight = 0) {
     if (!doc.sections || !doc.sections.length) return null;
     let best = null;
     let bestScore = -1;
     for (const s of doc.sections) {
       const tl = s.t.toLowerCase();
+      const hl = headerWeight ? (s.h || '').toLowerCase() : '';
       let c = 0;
-      for (const t of terms) c += countOccurrences(tl, t);
+      for (const t of terms) c += countOccurrences(tl, t) + headerWeight * countOccurrences(hl, t);
       if (c > bestScore) { bestScore = c; best = s; }
     }
     return best;
+  }
+
+  /** 取最相关的前 k 段（面试模式组装 AI 上下文用；标题命中权重高于正文）。 */
+  /**
+   * 取最相关的 k 段（喂给 AI 做资料）。标题命中按 6 倍权。
+   * 一段都没命中时退回首段——宁可给点上下文，也不要空资料。
+   */
+  topSections(doc, terms, k = 3) {
+    if (!doc.sections || !doc.sections.length) return [];
+    const scored = doc.sections.map((s) => {
+      const hl = (s.h || '').toLowerCase();
+      const tl = String(s.t || '').toLowerCase();
+      let c = 0;
+      for (const t of terms) c += 6 * countOccurrences(hl, t) + countOccurrences(tl, t);
+      return { s, c };
+    });
+    scored.sort((a, b) => b.c - a.c);
+    const out = [];
+    for (const it of scored) {
+      if (out.length >= k) break;
+      if (it.c > 0) out.push(it.s);
+    }
+    if (!out.length) out.push(doc.sections[0]);
+    return out;
   }
 
   topTags(limit) {
@@ -653,12 +833,32 @@ class SearchIndex {
   }
 
   /** 本地两阶段召回的第一阶段：加权词频评分（strongText 权重高，正文权重低）。 */
-  searchLocal(query, limit, filter) {
+  /**
+   * 本地关键词评分检索。
+   *
+   * opts（可选，面试模式用）：{ terms, wStrong, wBody, phraseBonusStrong, phraseBonusBody,
+   *   hotwords: string[], hotwordBoost, minScore, idfCap, logTf }
+   * 不传 opts 时用本插件一贯的默认权重与线性词频，行为与合并前完全一致。
+   * 面试模式传 logTf + idfCap=3.5：长文（命令手册式笔记）不靠堆词频霸榜，
+   * 稀有词（含跨词边界碎片）也不会把一两篇无关笔记顶到第一。
+   */
+  searchLocal(query, limit, filter, opts) {
     const q = String(query || '').trim();
     if (!q || this.docs.size === 0) return [];
+    const o = opts || {};
+    const wStrong = Number.isFinite(Number(o.wStrong)) ? Number(o.wStrong) : 6;
+    const wBody = Number.isFinite(Number(o.wBody)) ? Number(o.wBody) : 1;
+    const bonusStrong = Number.isFinite(Number(o.phraseBonusStrong)) ? Number(o.phraseBonusStrong) : 25;
+    const bonusBody = Number.isFinite(Number(o.phraseBonusBody)) ? Number(o.phraseBonusBody) : 12;
+    const minScore = Math.max(0, Number(o.minScore) || 0);
+    const idfCap = Number(o.idfCap) > 0 ? Number(o.idfCap) : Infinity;
+    const logTf = !!o.logTf;
+
     const docsArr = this.applyFilter([...this.docs.values()], filter);
     const N = docsArr.length;
-    const terms = [...new Set(tokenize(q))].slice(0, 24);
+    const terms = Array.isArray(o.terms) && o.terms.length
+      ? o.terms.slice(0, 24)
+      : [...new Set(tokenize(q))].slice(0, 24);
     const phrase = q.toLowerCase().replace(/\s+/g, '');
 
     // 直接用 parseDoc/recomputeDerived 缓存好的小写副本，不再每次按键重建全库副本（2.7）
@@ -679,10 +879,12 @@ class SearchIndex {
         if (a || b) df++;
       }
       if (!df) continue;
-      const idf = Math.log(1 + N / df);
+      const idf = Math.min(Math.log(1 + N / df), idfCap);
       const damp = df > N * 0.7 ? 0.25 : 1;
       for (let i = 0; i < N; i++) {
-        const w = cs[i] * 6 + cb[i];
+        const w = logTf
+          ? Math.log1p(cs[i]) * Math.max(0, wStrong) + Math.log1p(cb[i]) * Math.max(0, wBody)
+          : cs[i] * wStrong + cb[i] * wBody;
         if (w) {
           scores[i] += w * idf * damp;
           hitCount[i]++;
@@ -691,14 +893,27 @@ class SearchIndex {
     }
     if (phrase && phrase.length >= 2) {
       for (let i = 0; i < N; i++) {
-        if (strongCache[i].includes(phrase)) scores[i] += 25;
-        else if (bodyCache[i].includes(phrase)) scores[i] += 12;
+        if (strongCache[i].includes(phrase)) scores[i] += bonusStrong;
+        else if (bodyCache[i].includes(phrase)) scores[i] += bonusBody;
+      }
+    }
+    // 面试模式的热词加权：命中领域词的笔记整体抬分
+    const hotwords = Array.isArray(o.hotwords) ? o.hotwords : null;
+    const hotBoost = Math.max(0, Number(o.hotwordBoost) || 0);
+    if (hotwords && hotwords.length && hotBoost) {
+      const hws = hotwords.map((h) => String(h).toLowerCase()).filter((h) => h.length >= 2);
+      for (let i = 0; i < N; i++) {
+        let n = 0;
+        for (const hw of hws) {
+          if (strongCache[i].includes(hw) || bodyCache[i].includes(hw)) n++;
+        }
+        if (n) scores[i] += n * hotBoost;
       }
     }
 
     const idx = docsArr
       .map((_, i) => i)
-      .filter((i) => scores[i] > 0)
+      .filter((i) => scores[i] > 0 && scores[i] >= minScore)
       .sort((a, b) => scores[b] - scores[a])
       .slice(0, limit || 50);
 
@@ -708,7 +923,7 @@ class SearchIndex {
         doc,
         score: Math.round(scores[i]),
         hits: hitCount[i],
-        section: this.bestSection(doc, terms),
+        section: this.bestSection(doc, terms, Number(o.headerWeight) || 0),
       };
     });
   }
@@ -784,6 +999,16 @@ class AIClient {
       payload.response_format = { type: 'json_object' };
     }
     return payload;
+  }
+
+  /** 面试模式用：一次性问答，返回正文字符串。可覆盖模型与超时（面试要快，模型往往与主检索不同）。 */
+  chat(messages, opts = {}) {
+    const payload = this.buildPayload(messages, { temperature: opts.temperature });
+    if (opts.model) payload.model = opts.model;
+    // 0 = 不限制：网关不流式返回，调小只会让部分模型把思考过程当正文吐出来
+    const maxTokens = Number(opts.maxTokens) || 0;
+    if (maxTokens > 0) payload.max_tokens = Math.round(maxTokens);
+    return this.request(payload, { timeoutMs: opts.timeoutMs });
   }
 
   /** Node 原生 http/https 请求（与 metadata-ai 相同方式，无 CORS 限制）。 */
@@ -1445,6 +1670,280 @@ class AISearchModal extends Modal {
   }
 }
 
+/* ============================ 面试模式（1.0.0 由 interview-rag 并入） ============================ */
+
+/**
+ * 按长度裁剪但尽量切在句子/行边界：硬 slice 会把答案断在「否则 AOF 会覆盖掉要」这种半句上，
+ * 悬浮卡里看着像出错。优先回退到 cap 之前的最后一个句末标点或换行，实在找不到才硬截。
+ */
+function ivSmartClip(text, cap) {
+  const s = String(text || '');
+  if (s.length <= cap) return s;
+  const head = s.slice(0, cap);
+  const m = head.match(/^[\s\S]*[。！？；\n]/);
+  if (m && m[0].trim().length >= Math.min(120, cap * 0.5)) return m[0].trim();
+  return head.slice(0, Math.max(0, cap - 1)) + '…';
+}
+
+/**
+ * 本地要点回答：前 N 条命中各出一行「【标题】命中词附近摘要」。
+ * 零 API、毫秒级；悬浮卡直接可读。
+ */
+function ivBuildLocalAnswer(question, hits, s) {
+  if (!hits.length) return '知识库中未找到相关内容。';
+  const terms = queryTerms(question).slice(0, 12);
+  const lines = [];
+  const n = Math.max(1, Number(s.ivMaxSources) || 4);
+  for (let i = 0; i < hits.length && i < n; i++) {
+    const h = hits[i];
+    // plain=true：去掉 Markdown 标记，卡片上的句子要能直接照着念
+    const snip = makeSnippet(h.section, terms, Number(s.ivSnippetRadius) || 60, true)
+      || h.doc.summaryShort || (h.doc.summaryLong || '').slice(0, 120) || '';
+    lines.push((i + 1) + '. 【' + h.doc.title + '】' + snip);
+    if (s.ivShowSourcePaths) lines.push('   └ ' + h.doc.path);
+  }
+  const out = (s.ivAnswerTitle ? s.ivAnswerTitle + '：\n' : '') + lines.join('\n');
+  const cap = Math.max(100, Number(s.ivMaxAnswerChars) || 600);
+  return ivSmartClip(out, cap);
+}
+
+/**
+ * ragfile 桥接：监听 OBS 侧 bridge.py 写的 query.json，把 answer.json 写回去。
+ *
+ * 桥接契约见 D:\obs-interview\交接-RAG握手对接.md：
+ *   query.json  = {"id": <毫秒时间戳int>, "question": "..."}
+ *   answer.json = {"id": <同id>, "answer": "...", "sources": [{"path","title"}]}
+ *              或 {"id": <同id>, "error": "..."}
+ *   读取/写入均要求原子性（tmp + rename），UTF-8 无 BOM。
+ *
+ * ⚠️ 这段是与外部 Python 程序的握手协议，任何字段名/编码/原子写方式都不要改。
+ */
+class RagBridge {
+  constructor(plugin) {
+    this.plugin = plugin;
+    this.lastId = 0;
+    this.timer = null;
+    this.watcher = null;
+    this.checking = false;
+    this.rerun = false;
+    this.stopped = true;
+  }
+
+  start() {
+    if (!this.stopped) return;
+    this.stopped = false;
+    const dir = this.plugin.settings.ivRagDir;
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { /* 已存在/不可建则靠后续容错 */ }
+    // 开机时已存在的旧请求视为已处理：bridge 15s 就放弃了，答陈年问题没有意义
+    const cur = this.readQuery();
+    if (cur && Number.isFinite(cur.id)) this.lastId = cur.id;
+    try {
+      // persistent:false → 不阻止进程退出；监听失败也不影响轮询兜底
+      this.watcher = fs.watch(dir, { persistent: false }, () => this.scheduleCheck());
+    } catch (e) {
+      console.warn('[AI 检索] fs.watch 不可用，仅用轮询:', e.message);
+      this.watcher = null;
+    }
+    const ms = Math.max(100, Number(this.plugin.settings.ivPollMs) || 300);
+    // fs.watch 已就绪时，轮询只是兜底（watch 会立刻触发 scheduleCheck），
+    // 没必要仍按 pollMs 全速跑——默认 300ms 等于每秒 3 次 readFileSync 空转。
+    // 监听失败时才退回 pollMs 的原始节奏。
+    const effectiveMs = this.watcher ? Math.max(ms, 2000) : ms;
+    this.timer = setInterval(() => this.scheduleCheck(), effectiveMs);
+    this.scheduleCheck();
+    console.log(`[AI 检索] ragfile 监听已启动: ${dir}（轮询 ${effectiveMs}ms${this.watcher ? '，watch 为主' : '，仅轮询'}）`);
+  }
+
+  stop() {
+    this.stopped = true;
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    if (this.watcher) {
+      try { this.watcher.close(); } catch (e) { /* 忽略 */ }
+      this.watcher = null;
+    }
+    console.log('[AI 检索] ragfile 监听已停止');
+  }
+
+  queryPath() { return path.join(this.plugin.settings.ivRagDir, 'query.json'); }
+  answerPath() { return path.join(this.plugin.settings.ivRagDir, 'answer.json'); }
+
+  /** 读请求；文件缺失/读到半截 JSON 时返回 null，下个 tick 再试。 */
+  readQuery() {
+    try {
+      return JSON.parse(fs.readFileSync(this.queryPath(), 'utf8'));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /** 应答原子写：先写 .tmp 再改名；JSON.stringify + utf8 = UTF-8 无 BOM。 */
+  writeAnswer(obj) {
+    const a = this.answerPath();
+    const tmp = a + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(obj), 'utf8');
+    fs.renameSync(tmp, a);
+  }
+
+  /** 合并触发：watch 回调/轮询/处理完毕后再次触发共用；同一段时间只跑一次。 */
+  scheduleCheck() {
+    if (this.stopped) return;
+    if (this.checking) { this.rerun = true; return; }
+    this.checking = true;
+    Promise.resolve()
+      .then(() => this.check())
+      .catch((e) => console.warn('[AI 检索] 监听循环异常:', e))
+      .finally(() => {
+        this.checking = false;
+        if (this.rerun && !this.stopped) {
+          this.rerun = false;
+          this.scheduleCheck();
+        } else {
+          this.rerun = false;
+        }
+      });
+  }
+
+  async check() {
+    const q = this.readQuery();
+    if (!q || typeof q.id !== 'number' || q.id === this.lastId) return;
+    const question = typeof q.question === 'string' ? q.question : '';
+    this.lastId = q.id;   // 先记 id 再处理：处理中来了新请求靠 rerun 再查一次
+    const t0 = Date.now();
+    let payload;
+    try {
+      const r = await this.withDeadline(
+        Promise.resolve(this.plugin.ivProcessQuery(question)),
+        Math.max(2000, Number(this.plugin.settings.ivAnswerDeadlineMs) || 10000));
+      payload = { id: q.id, answer: r.answer, sources: r.sources || [] };
+    } catch (e) {
+      payload = { id: q.id, error: String((e && e.message) || e) };
+    }
+    try {
+      this.writeAnswer(payload);
+    } catch (e) {
+      console.error('[AI 检索] answer.json 写入失败:', e);
+      return;
+    }
+    const dt = Date.now() - t0;
+    console.log(`[AI 检索] query#${q.id} 已应答（${dt}ms）${payload.error ? ' error=' + payload.error : ''}`);
+    if (typeof this.plugin.ivOnBridgeAnswer === 'function') {
+      try { this.plugin.ivOnBridgeAnswer(q, payload, dt); } catch (e) { /* 界面刷新失败不影响桥接 */ }
+    }
+  }
+
+  /** 兜底时限：超时直接回错误应答，绝不静默（bridge 会傻等 15 秒）。 */
+  withDeadline(promise, ms) {
+    return new Promise((resolve, reject) => {
+      let timer = null;
+      let done = false;
+      const finish = (fn, v) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        fn(v);
+      };
+      timer = setTimeout(() => finish(reject, new Error('处理超时（' + ms + 'ms）')), ms);
+      promise.then(
+        (v) => finish(resolve, v),
+        (e) => finish(reject, e));
+    });
+  }
+}
+
+/* ============ 面试控制台（不依赖 bridge 调参/试答用） ============ */
+
+class IvTestModal extends Modal {
+  constructor(plugin) {
+    super(plugin.app);
+    this.plugin = plugin;
+  }
+
+  onOpen() {
+    this.modalEl.addClass('xivr-modal');
+    const content = this.contentEl;
+    content.empty();
+
+    content.appendChild(el('h3', '', '面试问答控制台'));
+    this.statusEl = el('div', 'xivr-hint');
+    content.appendChild(this.statusEl);
+    this.refreshStatusLine();
+
+    const s = this.plugin.settings;
+    new Setting(contentEl)
+      .setName('直答模式（代替我回答）')
+      .setDesc('开启后 AI 以第一人称口语代替你回答，悬浮卡上直接是能照着说的话；网关离线自动退回要点')
+      .addToggle((t) => t.setValue(s.ivSpokenEnabled).onChange(async (v) => {
+        s.ivSpokenEnabled = v; await this.plugin.saveSettings(); this.plugin.refreshStatusBar(); this.refreshStatusLine();
+      }));
+    new Setting(contentEl)
+      .setName('ragfile 监听（接收 bridge 转写提问）')
+      .setDesc('面试时保持开启；关掉后 bridge 的问题将无人应答（15s 超时上错误卡）')
+      .addToggle((t) => t.setValue(s.ivBridgeEnabled).onChange(async (v) => {
+        s.ivBridgeEnabled = v; await this.plugin.saveSettings();
+        if (v) this.plugin.bridge.start(); else this.plugin.bridge.stop();
+        this.plugin.refreshStatusBar(); this.refreshStatusLine();
+      }));
+
+    content.appendChild(el('div', 'xivr-hint',
+      '—— 试一试：模拟面试官提问，走和 bridge 完全相同的管线（召回 → 组装 → 来源）——'));
+
+    this.inputEl = el('input', 'xivr-input');
+    this.inputEl.type = 'text';
+    this.inputEl.placeholder = '输入面试官会问的问题，如：请介绍一下 Docker 的网络模式？';
+    content.appendChild(this.inputEl);
+
+    this.resultEl = el('div', 'xivr-result');
+    content.appendChild(this.resultEl);
+
+    this.inputEl.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        this.run(this.inputEl.value);
+      }
+    });
+    setTimeout(() => this.inputEl.focus(), 50);
+  }
+
+  /** 控制台顶部状态行：随开关即时刷新。 */
+  refreshStatusLine() {
+    if (!this.statusEl) return;
+    const s = this.plugin.settings;
+    const on = s.ivBridgeEnabled && this.plugin.bridge && !this.plugin.bridge.stopped;
+    this.statusEl.textContent = (on ? '● 监听中' : '○ 监听已停')
+      + ' · 索引 ' + (this.plugin.index ? this.plugin.index.docs.size : 0) + ' 篇'
+      + ' · 直答' + (s.ivSpokenEnabled ? '开' : '关');
+  }
+
+  async run(raw) {
+    const q = String(raw || '').trim();
+    const box = this.resultEl;
+    box.empty();
+    if (!q) return;
+    const t0 = Date.now();
+    box.appendChild(el('div', 'xivr-meta', '检索中…'));
+    try {
+      const r = await this.plugin.ivProcessQuery(q);
+      const dt = Date.now() - t0;
+      box.empty();
+      const usedMap = { spoken: '直答（第一人称）', ai: 'AI 精答', local: '本地要点' };
+      const used = usedMap[(this.plugin._ivDebug && this.plugin._ivDebug.used) || 'local'];
+      const hitN = this.plugin._ivDebug && this.plugin._ivDebug.hits ? this.plugin._ivDebug.hits.length : 0;
+      box.appendChild(el('div', 'xivr-meta', `${used} · 召回 ${hitN} 条 · ${dt}ms`));
+      box.appendChild(el('div', '', r.answer));
+      box.appendChild(el('div', 'xivr-src', r.sources.length
+        ? '来源：' + r.sources.map((s) => s.title).join('；')
+        : '来源：（无命中）'));
+    } catch (e) {
+      box.empty();
+      box.appendChild(el('div', 'xivr-error', '失败：' + ((e && e.message) || e)));
+    }
+  }
+
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
 /* ============================ 设置页 ============================ */
 
 class AISearchSettingTab extends PluginSettingTab {
@@ -1598,6 +2097,196 @@ class AISearchSettingTab extends PluginSettingTab {
         await this.plugin.index.clearCache();
         new Notice('AI 检索：索引缓存已清除');
       }));
+
+    /* ==================== 面试模式（1.0.0 由 interview-rag 并入） ==================== */
+
+    new Setting(contentEl).setName('面试问答 · 监听与桥接').setHeading();
+    new Setting(contentEl)
+      .setDesc('面试问答与上面的 AI 检索共用同一份索引、同一个 baseUrl / apiKey（只填一次），'
+        + '但模型、超时、评分权重各自独立——面试要「毫秒级 + 字面准」，与日常检索取舍不同。');
+    new Setting(contentEl)
+      .setName('启用 ragfile 监听')
+      .setDesc('监听 rag 目录的 query.json 并写 answer.json 应答 bridge')
+      .addToggle((t) => t.setValue(s.ivBridgeEnabled).onChange(async (v) => {
+        s.ivBridgeEnabled = v;
+        await this.plugin.saveSettings();
+        if (v) this.plugin.bridge.start(); else this.plugin.bridge.stop();
+        this.plugin.refreshStatusBar();
+      }));
+    new Setting(contentEl)
+      .setName('rag 目录')
+      .setDesc('bridge 写 query.json / 读 answer.json 的目录（与 bridge_config.json 的 rag.dir 一致）')
+      .addText((t) => t.setValue(s.ivRagDir).onChange(async (v) => { s.ivRagDir = v.trim(); await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('轮询间隔（毫秒）')
+      .setDesc('轮询 query.json 的间隔；fs.watch 同时在跑，这只是兜底。300ms 约等于最坏 0.3s 延迟')
+      .addText((t) => t.setValue(String(s.ivPollMs)).onChange(async (v) => {
+        const n = Number(v);
+        if (Number.isFinite(n) && n >= 100) { s.ivPollMs = Math.round(n); await this.plugin.saveSettings(); }
+      }));
+    new Setting(contentEl)
+      .setName('应答兜底时限（毫秒）')
+      .setDesc('从读到请求到必须写应答的硬时限，超时回错误应答。bridge 超时 15s，建议 ≤10000')
+      .addText((t) => t.setValue(String(s.ivAnswerDeadlineMs)).onChange(async (v) => {
+        const n = Number(v);
+        if (Number.isFinite(n) && n >= 2000) { s.ivAnswerDeadlineMs = Math.round(n); await this.plugin.saveSettings(); }
+      }));
+    new Setting(contentEl)
+      .setName('打开面试控制台')
+      .setDesc('模拟面试官提问，走和 bridge 完全相同的管线（召回 → 组装 → 来源），不用真开面试')
+      .addButton((b) => b.setButtonText('打开').onClick(() => this.plugin.ivOpenConsole()));
+
+    new Setting(contentEl).setName('面试问答 · 召回与权重').setHeading();
+    new Setting(contentEl)
+      .setName('召回候选上限')
+      .setDesc('评分后保留的候选数；回答只取前「来源条数」条')
+      .addSlider((t) => t.setLimits(10, 100, 5).setValue(s.ivRecallLimit).setDynamicTooltip()
+        .onChange(async (v) => { s.ivRecallLimit = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('来源条数')
+      .setDesc('回答要点条数 / answer.json 里 sources 的条数（bridge 取前 5 条显示）')
+      .addSlider((t) => t.setLimits(1, 8, 1).setValue(s.ivMaxSources).setDynamicTooltip()
+        .onChange(async (v) => { s.ivMaxSources = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('最低分数门槛')
+      .setDesc('低于该分的候选视为不相关直接丢弃（0 = 不过滤）；调大可减少答非所问')
+      .addSlider((t) => t.setLimits(0, 60, 2).setValue(s.ivMinScore).setDynamicTooltip()
+        .onChange(async (v) => { s.ivMinScore = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('强文本权重（标题/标签/摘要）')
+      .setDesc('命中标题、标签、AI 摘要时的每词权重；面试场景建议 4-10')
+      .addSlider((t) => t.setLimits(0, 15, 1).setValue(s.ivWStrong).setDynamicTooltip()
+        .onChange(async (v) => { s.ivWStrong = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('正文权重')
+      .setDesc('命中正文时的每词权重；过大容易让长文霸榜，建议 1-3')
+      .addSlider((t) => t.setLimits(0, 6, 1).setValue(s.ivWBody).setDynamicTooltip()
+        .onChange(async (v) => { s.ivWBody = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('整句命中加分（强文本）')
+      .setDesc('问题整句出现在标题/摘要区的额外加分')
+      .addSlider((t) => t.setLimits(0, 60, 5).setValue(s.ivPhraseBonusStrong).setDynamicTooltip()
+        .onChange(async (v) => { s.ivPhraseBonusStrong = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('整句命中加分（正文）')
+      .setDesc('问题整句出现在正文时的额外加分')
+      .addSlider((t) => t.setLimits(0, 40, 2).setValue(s.ivPhraseBonusBody).setDynamicTooltip()
+        .onChange(async (v) => { s.ivPhraseBonusBody = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('热词加分')
+      .setDesc('每命中一个热词给整篇笔记加的分（热词=当前面试领域词，抬高相关笔记）')
+      .addSlider((t) => t.setLimits(0, 30, 1).setValue(s.ivHotwordBoost).setDynamicTooltip()
+        .onChange(async (v) => { s.ivHotwordBoost = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('热词文件路径')
+      .setDesc('与 bridge 共用的 hotwords.txt；# 开头为注释，改动即时生效')
+      .addText((t) => t.setValue(s.ivHotwordsFile).onChange(async (v) => { s.ivHotwordsFile = v.trim(); await this.plugin.saveSettings(); }));
+
+    new Setting(contentEl).setName('面试问答 · 回答组装（本地要点）').setHeading();
+    new Setting(contentEl)
+      .setName('摘要半径（字符）')
+      .setDesc('每条要点围绕首个命中词前后各取多少字符；60 ≈ 每条 120 字')
+      .addSlider((t) => t.setLimits(30, 150, 10).setValue(s.ivSnippetRadius).setDynamicTooltip()
+        .onChange(async (v) => { s.ivSnippetRadius = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('回答前缀')
+      .setDesc('回答首行前缀，留空则不加（悬浮卡上靠它区分检索结果和转写原文）')
+      .addText((t) => t.setValue(s.ivAnswerTitle).onChange(async (v) => { s.ivAnswerTitle = v.trim(); await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('回答总长上限（字符）')
+      .setDesc('超出截断；悬浮卡 520px 宽，建议 400-800')
+      .addSlider((t) => t.setLimits(200, 1500, 50).setValue(s.ivMaxAnswerChars).setDynamicTooltip()
+        .onChange(async (v) => { s.ivMaxAnswerChars = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('要点里附笔记路径')
+      .setDesc('打开后每条要点下多一行路径（来源列表本来就单独传给 bridge）')
+      .addToggle((t) => t.setValue(s.ivShowSourcePaths).onChange(async (v) => { s.ivShowSourcePaths = v; await this.plugin.saveSettings(); }));
+
+    new Setting(contentEl).setName('面试问答 · 问题清洗').setHeading();
+    new Setting(contentEl)
+      .setName('最短问题字数')
+      .setDesc('去空白后短于该字数的请求直接回错误应答（挡住转写碎片）')
+      .addSlider((t) => t.setLimits(0, 12, 1).setValue(s.ivMinQuestionChars).setDynamicTooltip()
+        .onChange(async (v) => { s.ivMinQuestionChars = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('噪声正则（每行一个）')
+      .setDesc('命中的问题视为转写幻觉/噪声，回错误应答。例：^by bwd6$|^啊哈$|^叻+$')
+      .addTextArea((t) => {
+        t.inputEl.style.width = '100%';
+        t.inputEl.style.height = '80px';
+        t.setValue(s.ivNoiseRegex).onChange(async (v) => { s.ivNoiseRegex = v; await this.plugin.saveSettings(); });
+      });
+
+    new Setting(contentEl).setName('面试问答 · 直答模式（代替我回答）').setHeading();
+    new Setting(contentEl)
+      .setName('启用直答模式')
+      .setDesc('开启后 AI 以第一人称口语代替你回答面试官，悬浮卡上直接是能照着说的话；'
+        + '需要网关在线，失败自动退回「AI 精答 → 本地要点」，不会拖慢应答')
+      .addToggle((t) => t.setValue(s.ivSpokenEnabled).onChange(async (v) => {
+        s.ivSpokenEnabled = v; await this.plugin.saveSettings(); this.plugin.refreshStatusBar();
+      }));
+    new Setting(contentEl)
+      .setName('直答提示词')
+      .setDesc('控制「像人说话」的程度：长短、口头语、是否坦承不熟的部分都在这里调'
+        + (s.ivSpokenPromptPresets ? '；已注册风格命令：' + Object.keys(s.ivSpokenPromptPresets).join(' / ') : ''))
+      .addTextArea((t) => {
+        t.inputEl.style.width = '100%';
+        t.inputEl.style.height = '140px';
+        t.setValue(s.ivSpokenSystemPrompt).onChange(async (v) => { s.ivSpokenSystemPrompt = v; await this.plugin.saveSettings(); });
+      })
+      .addExtraButton((b) => b.setIcon('rotate-ccw').setTooltip('恢复默认')
+        .onClick(async () => { s.ivSpokenSystemPrompt = DEFAULT_IV_SPOKEN_PROMPT; await this.plugin.saveSettings(); this.display(); }));
+
+    new Setting(contentEl).setName('面试问答 · AI 精答').setHeading();
+    new Setting(contentEl)
+      .setName('启用 AI 精答')
+      .setDesc('网关在线时用 AI 把召回资料组织成口头回答；不在线自动降级本地要点，不影响应答速度')
+      .addToggle((t) => t.setValue(s.ivAiEnabled).onChange(async (v) => { s.ivAiEnabled = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('AI 协助（资料弱相关时用通用经验补齐）')
+      .setDesc('打开：召回资料只当参考，资料与问题无关就忽略、改由 AI 用通用工程经验作答并标注；'
+        + '关闭：严格只用资料，资料不足时只回「资料中未找到」')
+      .addToggle((t) => t.setValue(s.ivAiAssist).onChange(async (v) => { s.ivAiAssist = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('面试用模型')
+      .setDesc('与上面主检索的模型分开填：面试要快、要短。实测 cndeepseek-v4-flash 平均 5.2s、内容最完整；'
+        + 'cnminimax-m3 4.7s 偏短；cnhy3 4.4s 最省字但偏浅；cnglm-5.3-flash 与 cnkimi-k2.8-preview 8s 以上别用')
+      .addText((t) => t.setValue(s.ivModel).onChange(async (v) => { s.ivModel = v.trim(); await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('AI 超时（毫秒）')
+      .setDesc('必须小于应答兜底时限，否则超时的 AI 回答来不及上卡；到点自动降级本地要点')
+      .addText((t) => t.setValue(String(s.ivTimeoutMs)).onChange(async (v) => {
+        const n = Number(v);
+        if (Number.isFinite(n) && n >= 1000) { s.ivTimeoutMs = Math.round(n); await this.plugin.saveSettings(); }
+      }));
+    new Setting(contentEl)
+      .setName('输出上限（token，0=不限）')
+      .setDesc('⚠️ 一般留 0。网关不流式返回，把它调小并不会让答案变快，反而会让部分模型把思考过程当正文吐出来、答案断在半句（实测 deepseek 系必现）。要提速就换模型')
+      .addSlider((t) => t.setLimits(0, 1200, 40).setValue(s.ivMaxTokens).setDynamicTooltip()
+        .onChange(async (v) => { s.ivMaxTokens = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('AI 资料条数')
+      .setDesc('喂给 AI 的笔记条数（实测 3 条与 5 条延迟无差别，砍它只丢引用不省时间）')
+      .addSlider((t) => t.setLimits(3, 10, 1).setValue(s.ivContextDocs).setDynamicTooltip()
+        .onChange(async (v) => { s.ivContextDocs = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('单篇资料字符上限')
+      .addSlider((t) => t.setLimits(500, 3000, 100).setValue(s.ivContextCharsPerDoc).setDynamicTooltip()
+        .onChange(async (v) => { s.ivContextCharsPerDoc = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('AI 失败降级本地要点')
+      .setDesc('关闭后 AI 失败直接回错误应答（卡片显示失败原因）')
+      .addToggle((t) => t.setValue(s.ivAiFallbackLocal).onChange(async (v) => { s.ivAiFallbackLocal = v; await this.plugin.saveSettings(); }));
+    new Setting(contentEl)
+      .setName('AI 精答提示词')
+      .setDesc('「AI 协助」打开时会在这段提示词后面自动追加一段「资料弱相关怎么办」的补充规则')
+      .addTextArea((t) => {
+        t.inputEl.style.width = '100%';
+        t.inputEl.style.height = '140px';
+        t.setValue(s.ivAiSystemPrompt).onChange(async (v) => { s.ivAiSystemPrompt = v; await this.plugin.saveSettings(); });
+      })
+      .addExtraButton((b) => b.setIcon('rotate-ccw').setTooltip('恢复默认')
+        .onClick(async () => { s.ivAiSystemPrompt = DEFAULT_IV_AI_PROMPT; await this.plugin.saveSettings(); this.display(); }));
   }
 }
 
@@ -1608,9 +2297,12 @@ class AISearchPlugin extends Plugin {
     await this.loadSettings();
     this.index = new SearchIndex(this);
     this.client = new AIClient(this);
+    this.bridge = new RagBridge(this);
     this.lastQuery = '';
     this._rebuilding = false;
     this._unloaded = false;
+    this._ivDebug = null;      // 最近一次面试问答的调试信息（控制台显示召回条数/降级路径）
+    this.lastAnswer = null;    // 最近一次 bridge 应答（控制台展示用）
 
     this.statusBarEl = this.addStatusBarItem();
     this.statusBarEl.onclick = () => this.openSearch();
@@ -1625,11 +2317,57 @@ class AISearchPlugin extends Plugin {
     // 品牌分组标记（见 snippets/xyblue135-brand.css）
     const __brandEl = document.querySelector('.side-dock-ribbon-action[aria-label="' + 'AI 检索' + '"]');
     if (__brandEl) __brandEl.addClass('xyblue135-ribbon xyblue135-ai');
+    this.addRibbonIcon('graduation-cap', '面试问答控制台', () => this.ivOpenConsole());
+    const __brandIv = document.querySelector('.side-dock-ribbon-action[aria-label="' + '面试问答控制台' + '"]');
+    if (__brandIv) __brandIv.addClass('xyblue135-ribbon xyblue135-ai');
     this.addCommand({
       id: 'rebuild-ai-search-index',
       name: '重建检索索引',
       callback: () => this.rebuildIndex(true),
     });
+
+    /* ---- 面试模式命令（原 interview-rag 的 4 条 + 风格预设）---- */
+    this.addCommand({
+      id: 'iv-open-console',
+      name: '面试问答：打开控制台（模拟提问试答）',
+      callback: () => this.ivOpenConsole(),
+    });
+    this.addCommand({
+      id: 'iv-rebuild-index',
+      name: '面试问答：重建索引（与 AI 检索共用同一份）',
+      callback: () => this.rebuildIndex(true),
+    });
+    this.addCommand({
+      id: 'iv-toggle-bridge',
+      name: '面试问答：开/关 ragfile 监听',
+      callback: async () => {
+        this.settings.ivBridgeEnabled = !this.settings.ivBridgeEnabled;
+        await this.saveSettings();
+        if (this.settings.ivBridgeEnabled) this.bridge.start(); else this.bridge.stop();
+        this.refreshStatusBar();
+        new Notice('AI 检索：面试监听已' + (this.settings.ivBridgeEnabled ? '开启' : '关闭'));
+      },
+    });
+    this.addCommand({
+      id: 'iv-toggle-spoken',
+      name: '面试问答：开/关 直答模式（第一人称代替回答）',
+      callback: () => this.ivToggleSpoken(),
+    });
+    // 面试风格预设：ivSpokenPromptPresets 里的每个键注册一条切换命令（可盲绑热键）
+    const __styles = this.settings.ivSpokenPromptPresets || null;
+    if (__styles && typeof __styles === 'object') {
+      for (const __name of Object.keys(__styles)) {
+        this.addCommand({
+          id: 'iv-style-' + __name,
+          name: '面试风格 → ' + __name,
+          callback: async () => {
+            this.settings.ivSpokenSystemPrompt = __styles[__name];
+            await this.saveSettings();
+            new Notice('面试风格已切换: ' + __name, 3000);
+          },
+        });
+      }
+    }
 
     this.registerEvent(this.app.vault.on('modify', (f) => {
       if (f instanceof TFile && f.extension === 'md') this.index.scheduleUpdate(f);
@@ -1658,6 +2396,8 @@ class AISearchPlugin extends Plugin {
         await this.index.load();
       }
       if (this._unloaded) return;
+      // 索引就绪后才开 ragfile 监听：否则启动瞬间来的提问会查到空索引直接回「未找到」
+      if (this.settings.ivBridgeEnabled) this.bridge.start();
       this.refreshStatusBar();
       if (this.settings.embeddingEnabled) {
         this.index.ensureVectors((d, n) => this.refreshStatusBar(`语义索引 ${d}/${n}`))
@@ -1686,6 +2426,7 @@ class AISearchPlugin extends Plugin {
   onunload() {
     // 事件由 registerEvent 自动清理；这里清掉自建的定时器，避免卸载后仍写盘/刷新视图（2.6）
     this._unloaded = true;
+    if (this.bridge) this.bridge.stop();
     if (this.index) {
       clearTimeout(this.index._saveTimer);
       clearTimeout(this.index._modTimer);
@@ -1719,6 +2460,184 @@ class AISearchPlugin extends Plugin {
     new AISearchModal(this).open();
   }
 
+  /* ---------------- 面试模式（原 interview-rag 的能力） ---------------- */
+
+  ivOpenConsole() {
+    new IvTestModal(this).open();
+  }
+
+  /** 直答模式开关：命令面板与设置页共用。 */
+  async ivToggleSpoken() {
+    this.settings.ivSpokenEnabled = !this.settings.ivSpokenEnabled;
+    await this.saveSettings();
+    this.refreshStatusBar();
+    new Notice('AI 检索：直答模式已'
+      + (this.settings.ivSpokenEnabled ? '开启（AI 以第一人称代答）' : '关闭'));
+  }
+
+  /** bridge 应答完成后的界面回调（由 RagBridge 调用）。 */
+  ivOnBridgeAnswer(q, payload, ms) {
+    this.lastAnswer = { question: q.question, payload, ms };
+    this.refreshStatusBar();
+    if (payload.error) new Notice('AI 检索：' + payload.error, 5000);
+  }
+
+  /**
+   * 完整问答管线：清洗 → 本地召回 → （可选）直答/AI 精答 → 组装。
+   * bridge 与控制台共用；抛错时由 RagBridge 转成错误应答。
+   */
+  async ivProcessQuery(question) {
+    const s = this.settings;
+    const q = String(question || '').trim();
+    if (q.length < Math.max(0, Number(s.ivMinQuestionChars) || 0)) {
+      throw new Error('问题太短（' + q.length + ' 字），已忽略');
+    }
+    const noise = String(s.ivNoiseRegex || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+    for (const line of noise) {
+      const re = safeRegExp(line);
+      if (re && re.test(q)) throw new Error('噪声问题已过滤（匹配 ' + line + '）');
+    }
+
+    const hotwords = this.ivLoadHotwords();
+    const hits = this.index.searchLocal(q, Math.max(1, Number(s.ivRecallLimit) || 50), null, {
+      // 查询侧先挖掉疑问/礼貌词：否则「障怎」「么处」这类跨词碎片 idf 最高，最容易被顶上来
+      terms: queryTerms(q),
+      wStrong: s.ivWStrong,
+      wBody: s.ivWBody,
+      phraseBonusStrong: s.ivPhraseBonusStrong,
+      phraseBonusBody: s.ivPhraseBonusBody,
+      hotwords,
+      hotwordBoost: s.ivHotwordBoost,
+      minScore: s.ivMinScore,
+      idfCap: 3.5,
+      logTf: true,
+      headerWeight: 3,
+    });
+    this._ivDebug = { question: q, hits, used: 'local' };
+
+    let answer = null;
+    if (s.ivSpokenEnabled) {
+      // 直答模式：第一人称口语代替回答；失败自动落回下面的要点链，绝不静默
+      try {
+        answer = await this.ivSpokenAnswer(q, hits);
+        this._ivDebug.used = 'spoken';
+      } catch (e) {
+        console.warn('[AI 检索] 直答失败，降级要点模式:', e.message);
+        new Notice('AI 检索：直答不可用，已退回要点模式', 4000);
+      }
+    }
+    if (!answer && s.ivAiEnabled) {
+      try {
+        answer = await this.ivAiAnswer(q, hits);
+        this._ivDebug.used = 'ai';
+      } catch (e) {
+        console.warn('[AI 检索] AI 回答失败，降级本地要点:', e.message);
+        if (!s.ivAiFallbackLocal) throw new Error('AI 回答失败：' + e.message);
+        new Notice('AI 检索：AI 不可用，已用本地要点作答', 4000);
+      }
+    }
+    if (!answer) answer = ivBuildLocalAnswer(q, hits, s);
+
+    const sources = hits.slice(0, Math.max(1, Number(s.ivMaxSources) || 4))
+      .map((h) => ({ path: h.doc.path, title: h.doc.title }));
+    return { answer, sources };
+  }
+
+  /**
+   * AI 精答：召回资料块 → 短超时 chat。失败由调用方降级本地要点。
+   * ivAiAssist 打开时，资料只当参考——本地召回是按字面加权的，问「redis 故障怎么处理」常常
+   * 只召回到安装/命令类同名笔记，此时让模型忽略无关资料、用通用工程经验作答才有用。
+   */
+  async ivAiAnswer(question, hits) {
+    const s = this.settings;
+    const assist = s.ivAiAssist !== false;
+    if (!hits.length && !assist) throw new Error('知识库未找到相关内容，无法 AI 作答');
+    const blocks = this.ivBuildContextBlocks(question, hits);
+    const sys = assist
+      ? String(s.ivAiSystemPrompt || '') + '\n\n' + IV_ASSIST_HINT
+      : String(s.ivAiSystemPrompt || '');
+    const user = (blocks.length
+      ? '【资料】（可能只与本问题字面相关，自己判断是否可用）\n' + blocks.join('\n\n')
+      : '【资料】（本次召回无相关笔记，请直接用通用工程经验回答）')
+      + '\n\n【面试官问题】\n' + question;
+    const content = await this.client.chat(
+      [{ role: 'system', content: sys }, { role: 'user', content: user }],
+      {
+        temperature: 0.2,
+        timeoutMs: Number(s.ivTimeoutMs) || 10000,
+        model: s.ivModel || undefined,
+        maxTokens: s.ivMaxTokens,
+      });
+    const out = String(content || '').trim();
+    if (!out) throw new Error('AI 返回为空');
+    return ivSmartClip(out, Math.max(100, Number(s.ivMaxAnswerChars) || 600));
+  }
+
+  /** 组装 AI 上下文资料块（ivAiAnswer 与 ivSpokenAnswer 共用）。 */
+  ivBuildContextBlocks(question, hits) {
+    const s = this.settings;
+    const docsN = Math.max(1, Number(s.ivContextDocs) || 5);
+    const perDoc = Math.max(200, Number(s.ivContextCharsPerDoc) || 1000);
+    const qterms = queryTerms(question).slice(0, 24);
+    return hits.slice(0, docsN).map((h, i) => {
+      let text = '';
+      // 取最相关的 3 段：命中段 + 标题命中段，比只给「首段 + 命中段」更能覆盖到真正的答案段
+      const picked = this.index.topSections(h.doc, qterms, 3);
+      if (picked.length) {
+        text = picked.map((p) => (p.h ? '【' + p.h + '】\n' : '') + p.t).join('\n……\n');
+      }
+      if (!text) text = h.doc.summaryShort || h.doc.summaryLong || '';
+      text = text.slice(0, perDoc);
+      return '[' + (i + 1) + '] 《' + h.doc.title + '》（' + h.doc.path + '）\n' + text;
+    });
+  }
+
+  /**
+   * 直答模式：以第一人称口语代替候选人回答，照着说即可。
+   * 提示词独立可调（ivSpokenSystemPrompt）；温度略高换自然度；失败由 ivProcessQuery 降级要点链。
+   */
+  async ivSpokenAnswer(question, hits) {
+    const s = this.settings;
+    const assist = s.ivAiAssist !== false;
+    if (!hits.length && !assist) throw new Error('知识库未找到相关内容，无法直答');
+    const blocks = this.ivBuildContextBlocks(question, hits);
+    const sys = String(s.ivSpokenSystemPrompt || DEFAULT_IV_SPOKEN_PROMPT)
+      + (assist ? '\n\n' + IV_ASSIST_HINT : '');
+    const user = (blocks.length
+      ? '【资料】（可能只与本问题字面相关，自己判断是否可用）\n' + blocks.join('\n\n')
+      : '【资料】（本次召回无相关笔记，请直接用通用工程经验回答）')
+      + '\n\n【面试官问题】\n' + question;
+    const content = await this.client.chat(
+      [{ role: 'system', content: sys }, { role: 'user', content: user }],
+      {
+        temperature: 0.4,
+        timeoutMs: Number(s.ivTimeoutMs) || 10000,
+        model: s.ivModel || undefined,
+        maxTokens: s.ivMaxTokens,
+      });
+    const out = String(content || '').trim();
+    if (!out) throw new Error('AI 返回为空');
+    return ivSmartClip(out, Math.max(100, Number(s.ivMaxAnswerChars) || 600));
+  }
+
+  /** 热词读取：# 开头为注释；按 mtime 缓存，文件改动即时生效。 */
+  ivLoadHotwords() {
+    const file = String(this.settings.ivHotwordsFile || '').trim();
+    if (!file) return [];
+    try {
+      const st = fs.statSync(file);
+      if (this._ivHwCache && this._ivHwCache.mtime === st.mtimeMs) return this._ivHwCache.words;
+      const words = fs.readFileSync(file, 'utf8')
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith('#'));
+      this._ivHwCache = { mtime: st.mtimeMs, words };
+      return words;
+    } catch (e) {
+      return [];
+    }
+  }
+
   async rebuildIndex(force) {
     // 与 reconcile 互斥：正在跑同步时不允许 clear()+saveNow()，否则会把空索引写进 index.json（2.1）
     if (this._rebuilding || (this.index && this.index._busy)) { new Notice('AI 检索：正在索引中，请稍后再试'); return; }
@@ -1750,13 +2669,63 @@ class AISearchPlugin extends Plugin {
       return;
     }
     this.statusBarEl.style.display = '';
+    // 面试模式的状态并进同一个状态栏：合并后不该再多占一格
+    let iv = '';
+    if (this.settings.ivBridgeEnabled) {
+      iv = (this.bridge && !this.bridge.stopped) ? ' · 监听中' : ' · 监听已停';
+    }
+    if (this.settings.ivSpokenEnabled) iv += ' · 直答';
     if (st.state === 'building') this.statusBarEl.setText(`AI 检索：索引中 ${st.done}/${st.total}`);
     else if (extraText) this.statusBarEl.setText('AI 检索：' + extraText);
-    else this.statusBarEl.setText(`AI 检索：${this.index ? this.index.docs.size : 0} 篇`);
+    else this.statusBarEl.setText(`AI 检索：${this.index ? this.index.docs.size : 0} 篇${iv}`);
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, (await this.loadData()) || {});
+    const raw = (await this.loadData()) || {};
+    await this.migrateLegacyInterviewRag(raw);
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, raw);
+  }
+
+  /**
+   * 把原 00_xyblue135-interview-rag/data.json 的设置搬成 iv* 前缀（1.0.0 合并时用）。
+   * 旧键与 iv 键一一对应（iv + 首字母大写），只有 baseUrl / apiKey / 白名单 / 状态栏开关
+   * 是两边共用的，不搬——它们本来就该只有一份。
+   * 幂等：只填当前为空的值，写完打 migratedFromInterviewRag 标记，重跑不再动。
+   */
+  async migrateLegacyInterviewRag(raw) {
+    if (raw.migratedFromInterviewRag) return;
+    const shared = new Set([
+      'baseUrl', 'apiKey', 'whitelistFolder', 'includeSubfolders',
+      'autoIndexOnStartup', 'statusBarEnabled',
+    ]);
+    // 少数几个旧键在合并时去掉了冗余的 ai 前缀（ivTimeoutMs 比 ivAiTimeoutMs 好读）
+    const alias = {
+      aiTimeoutMs: 'ivTimeoutMs',
+      aiMaxTokens: 'ivMaxTokens',
+      aiContextDocs: 'ivContextDocs',
+      aiContextCharsPerDoc: 'ivContextCharsPerDoc',
+    };
+    let legacy = null;
+    try {
+      const dir = this.manifest && this.manifest.dir;
+      // 旧插件目录与本插件同父级；用 manifest.dir 推导，避免依赖 configDir 的写法
+      const file = path.join(path.dirname(dir || ''), '00_xyblue135-interview-rag', 'data.json');
+      legacy = JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch (e) {
+      return;   // 旧目录已删（正常情况）→ 什么都不用做
+    }
+    let n = 0;
+    for (const key of Object.keys(legacy || {})) {
+      if (shared.has(key)) continue;
+      const target = alias[key] || ('iv' + key.charAt(0).toUpperCase() + key.slice(1));
+      if (!(target in DEFAULT_SETTINGS)) continue;
+      if (raw[target] !== undefined && raw[target] !== '' && raw[target] !== null) continue;
+      raw[target] = legacy[key];
+      n++;
+    }
+    raw.migratedFromInterviewRag = true;
+    if (n) await this.saveData(raw);
+    if (n) console.log('[AI 检索] 已从旧 interview-rag 迁移 ' + n + ' 项面试设置');
   }
 
   async saveSettings() {
@@ -1766,7 +2735,9 @@ class AISearchPlugin extends Plugin {
 
 module.exports = AISearchPlugin;
 module.exports.__internal = {
-  tokenize, countOccurrences, fnv1a, escapeHtml, highlight, makeSnippet,
-  parseFrontmatterFallback, extractJson, matchCandidate, normalizeTags,
+  tokenize, queryTerms, safeRegExp, countOccurrences, fnv1a, escapeHtml, highlight, makeSnippet,
+  sanitizeSnippet, parseFrontmatterFallback, extractJson, matchCandidate, normalizeTags,
   recomputeDerived, serializeDoc, SearchIndex, AIClient, cosineSim,
+  RagBridge, IvTestModal, ivSmartClip, ivBuildLocalAnswer,
+  DEFAULT_SETTINGS, DEFAULT_IV_AI_PROMPT, IV_ASSIST_HINT, DEFAULT_IV_SPOKEN_PROMPT,
 };

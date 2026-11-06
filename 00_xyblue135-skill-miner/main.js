@@ -13,6 +13,8 @@
 const {
   Plugin, Modal, PluginSettingTab, Setting, Notice, TFile,
   normalizePath, setIcon,
+  // 岗位透镜面板用（0.11.0 并入）：自定义视图 + 渲染报告 Markdown
+  ItemView, MarkdownRenderer,
 } = require('obsidian');
 const http = require('http');
 const https = require('https');
@@ -291,6 +293,62 @@ const DEFAULT_RESUME_HARNESS = [
   '5. 全部中文；只输出 JSON。',
 ].join('\n');
 
+/* 岗位透镜视图 id：沿用原 00_xyblue135-job-lens 的字符串，
+   这样 workspace.json 里已存的视图合并后仍能正常恢复。 */
+const JOB_LENS_VIEW_TYPE = 'xyblue135-job-lens-view';
+
+/* ---------- 岗位透镜的 LLM 调用（沿用原 job-lens 实现：429/502 自动重试） ----------
+   与 AIClient 并存而不复用，是因为这里要求「失败重试 + 90 秒长超时」的独立策略，
+   报告类长文本生成对超时更敏感。函数名加 jobLens 前缀，避免与既有 extractJson 冲突。 */
+function jobLensChat(base, key, model, messages, timeoutMs) {
+  let attempt = 0;
+  const once = () => jobLensChatOnce(base, key, model, messages, timeoutMs);
+  const retry = (e) => {
+    const msg = String((e && e.message) || '');
+    if (/502|429|rate|limit/i.test(msg) && attempt < 2) {
+      attempt++;
+      return new Promise((r) => setTimeout(r, 3000 * attempt)).then(once).catch(retry);
+    }
+    throw e;
+  };
+  return once().catch(retry);
+}
+
+function jobLensChatOnce(base, key, model, messages, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let url;
+    try { url = new URL(String(base || '').replace(/\/+$/, '') + '/chat/completions'); }
+    catch (e) { reject(new Error('AI 接口地址无效：' + base)); return; }
+    const mod = url.protocol === 'https:' ? https : http;
+    const body = JSON.stringify({ model: model || 'auto', messages: messages, temperature: 0.3 });
+    const headers = { 'Content-Type': 'application/json' };
+    if (key) headers.Authorization = 'Bearer ' + key;
+    const req = mod.request(url, { method: 'POST', headers, timeout: timeoutMs }, (res) => {
+      let buf = '';
+      res.setEncoding('utf8');
+      res.on('data', (c) => { buf += c; });
+      res.on('end', () => {
+        try {
+          const d = JSON.parse(buf);
+          if (d.error) return reject(new Error(d.error.message || JSON.stringify(d.error).slice(0, 120)));
+          resolve(String((d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || ''));
+        } catch (e) { reject(new Error('网关返回解析失败: ' + buf.slice(0, 120))); }
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error('AI 请求超时')));
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+function jobLensExtractJson(text) {
+  const m = String(text || '').match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  const s = String(text || '');
+  const raw = m ? m[1] : s.slice(s.indexOf('{'), s.lastIndexOf('}') + 1);
+  return JSON.parse(raw);
+}
+
 const DEFAULT_SETTINGS = {
   baseUrl: 'http://127.0.0.1:31415/v1',
   apiKey: '',
@@ -306,6 +364,9 @@ const DEFAULT_SETTINGS = {
   outputFolder: 'my_blog/不受监管的文档/00_暂未分类',
 
   interviewCount: 5,
+
+  // 岗位透镜（0.11.0 起由原 00_xyblue135-job-lens 并入）
+  jobLensInbox: 'my_blog/00_docs/收件箱',
 
   resumeAppendixEnabled: true,
 
@@ -3025,6 +3086,14 @@ class SkillMinerSettingTab extends PluginSettingTab {
       .addSlider((t) => t.setLimits(3, 10, 1).setValue(s.interviewCount).setDynamicTooltip()
         .onChange(async (v) => { s.interviewCount = v; await this.plugin.saveAll(); }));
 
+    new Setting(contentEl).setName('岗位透镜').setHeading();
+    new Setting(contentEl).setName('收件箱目录')
+      .setDesc('「导出待办」把学习方向 / 技能缺口写成待办笔记的位置。分析报告存在本插件目录的 reports/ 内（不入 git），面板右上角可新分析 / 导出待办。')
+      .addText((t) => t.setValue(s.jobLensInbox).onChange(async (v) => {
+        s.jobLensInbox = v.trim() || DEFAULT_SETTINGS.jobLensInbox;
+        await this.plugin.saveAll();
+      }));
+
     new Setting(contentEl).setName('AI 提示词（Harness）').setHeading();
     const harness = (name, key, def, height) => {
       new Setting(contentEl).setName(name)
@@ -3059,6 +3128,17 @@ class SkillMinerPlugin extends Plugin {
     this.addCommand({ id: 'open-skill-miner', name: '打开技能提炼', callback: () => this.openPanel() });
     this.addCommand({ id: 'rebuild-skill-matrix', name: '重建技能矩阵', callback: () => this.rebuildMatrix(false) });
     this.addCommand({ id: 'start-interview', name: '开始模拟面试', callback: () => new InterviewModal(this).open() });
+
+    /* ── 岗位透镜（原 00_xyblue135-job-lens，0.11.0 并入本插件）──
+       视图 id 与命令语义保持原样，只是命令 id 加了 job-lens- 前缀。 */
+    this.registerView(JOB_LENS_VIEW_TYPE, (leaf) => new JobLensView(leaf, this));
+    const jlRibbon = this.addRibbonIcon('compass', '岗位透镜', () => this.activateView());
+    jlRibbon.addClass('xyblue135-ribbon xyblue135-ai');
+    this.addCommand({ id: 'job-lens-open', name: '岗位透镜：打开面板', callback: () => this.activateView() });
+    this.addCommand({ id: 'job-lens-discover', name: '岗位透镜：岗位契合度发现（从技能矩阵反推）', callback: () => { void this.runDiscover(''); } });
+    this.addCommand({ id: 'job-lens-export-todos', name: '岗位透镜：导出最近分析的缺口为收件箱待办', callback: () => { void this.exportTodos(); } });
+    this.app.workspace.onLayoutReady(() => { void this.migrateLegacyJobLens(); });
+
     this.addSettingTab(new SkillMinerSettingTab(this.app, this));
 
     // 启动时静默构建技能矩阵（纯本地，秒级），AI 结果从 data.json 缓存读取
@@ -3081,6 +3161,8 @@ class SkillMinerPlugin extends Plugin {
       selectedBullets: {}, selectedTraits: {},
       pulse: null, plan: null, planDone: {},
       manual: null, ghRepos: null, ghEnhanced: null, resume: null,
+      // 岗位透镜的状态（0.11.0 由原 job-lens 并入，配置项只有 settings.jobLensInbox）
+      jobLens: { lastRole: '', history: [], reportPaths: [], lastReportPath: '' },
     }, raw.data || {});
     this.seedManual();
     // 兼容旧缓存：把「以句子原文为键」的勾选状态迁成归一化稳定键
@@ -3513,9 +3595,412 @@ class SkillMinerPlugin extends Plugin {
     }
   }
 
+  /* ==================== 岗位透镜（原 00_xyblue135-job-lens，0.11.0 并入） ====================
+     与原版的差异：
+       1. 不再跨插件读 data.json —— 技能清单直接取本插件已算好的 this.data.refined，
+          网关配置直接用本插件 settings，少一层 IO、少一处「未读到网关配置」的报错；
+       2. 状态（历史/报告路径）存 this.data.jobLens，配置只有 settings.jobLensInbox；
+       3. reports 目录跟随本插件（.gitignore 里已忽略各插件的 reports 目录）。 */
+
+  jobLensState() {
+    if (!this.data.jobLens || typeof this.data.jobLens !== 'object') {
+      this.data.jobLens = { lastRole: '', history: [], reportPaths: [], lastReportPath: '' };
+    }
+    const s = this.data.jobLens;
+    if (!Array.isArray(s.history)) s.history = [];
+    if (!Array.isArray(s.reportPaths)) s.reportPaths = [];
+    if (typeof s.lastRole !== 'string') s.lastRole = '';
+    if (typeof s.lastReportPath !== 'string') s.lastReportPath = '';
+    return s;
+  }
+
+  jobLensInventory() {
+    const refined = (this.data && Array.isArray(this.data.refined)) ? this.data.refined : [];
+    return {
+      inventory: refined.map((r) => r.name + '|' + (r.track || '') + '|' + (r.level || '')).join('\n'),
+      refinedCount: refined.length,
+    };
+  }
+
+  async activateView() {
+    const { workspace } = this.app;
+    let leaf = workspace.getLeavesOfType(JOB_LENS_VIEW_TYPE)[0];
+    if (!leaf) {
+      leaf = workspace.getLeaf('tab');
+      await leaf.setViewState({ type: JOB_LENS_VIEW_TYPE, active: true });
+    }
+    workspace.revealLeaf(leaf);
+  }
+
+  refreshViewIfOpen() {
+    const leaf = this.app.workspace.getLeavesOfType(JOB_LENS_VIEW_TYPE)[0];
+    if (leaf && leaf.view && typeof leaf.view.renderLatest === 'function') {
+      void leaf.view.renderLatest();
+    }
+  }
+
+  openJobLensModal() {
+    new JobLensModal(this.app, this).open();
+  }
+
+  async callJobLensLLM(sys, user) {
+    const base = this.settings.baseUrl;
+    if (!base) throw new Error('未配置 AI 接口地址（设置 → 技能提炼 → API Base URL）');
+    const msgs = [{ role: 'system', content: sys }, { role: 'user', content: user }];
+    let out = await jobLensChat(base, this.settings.apiKey, this.settings.model, msgs, 90000);
+    try {
+      return jobLensExtractJson(out);
+    } catch (e) {
+      out = await jobLensChat(base, this.settings.apiKey, this.settings.model,
+        [{ role: 'system', content: sys + '\n上一次输出无法解析。重新输出，必须是一个合法 JSON 对象。' }, { role: 'user', content: user }],
+        90000);
+      return jobLensExtractJson(out);
+    }
+  }
+
+  /* 主流程：岗位契合度发现（零输入，从矩阵反推） */
+  async discover(preferNote) {
+    const sm = this.jobLensInventory();
+    if (!sm.inventory) throw new Error('技能清单为空（先在本插件里重建技能矩阵并完成 AI 提炼）');
+    const sys = [
+      '你是资深技术招聘顾问，熟悉中国就业市场 2024-2026（注意：市场认知来自训练数据，非实时，结论保守）。',
+      '输入：候选人的技能清单（每行 `技能名|方向|定级`，定级来自其知识库证据链）。可能附候选人偏好说明。',
+      '任务：反推候选人当前技能组合最适合哪些岗位方向——不是验证某个岗位，而是发现岗位。',
+      '要求：',
+      '1. 以技能清单为唯一事实来源，只推荐清单能支撑的岗位，宁缺毋滥；',
+      '2. 覆盖三类：直接可投（核心技能全占）、补强后强（差1~2个高频技能，说明补什么）、差异化蓝海（稀缺组合，竞争少）；',
+      '3. 每个岗位给出 Boss 直聘上实际应该搜的搜索关键词；',
+      '4. 薪资给保守区间并注明仅供参考。',
+      '只输出 JSON：',
+      '{"market_note":"当前市场环境一句话(<=100字)",',
+      ' "roles":[{"role":"岗位名","fit":0到100,"tier":"直接可投|补强后强|差异化蓝海","why":"契合理由(引用具体技能簇名)","matching":["核心匹配簇"],"missing_easy":["容易补的小缺口"],"missing_hard":["需大投入的缺口"],"search_keywords":["Boss搜索词"],"salary_hint":"保守区间(仅供参考)"}] (6~10个,按fit降序),',
+      ' "advice":"一句话建议(<=80字)"}',
+    ].join('\n');
+    const user = '【候选人技能清单】\n' + sm.inventory + (preferNote ? '\n\n【候选人偏好】\n' + preferNote : '');
+    const data = await this.callJobLensLLM(sys, user);
+    const st = this.jobLensState();
+    data.generatedAt = Date.now();
+    data.refinedCount = sm.refinedCount;
+    st.history = [{ role: '岗位契合度发现', at: data.generatedAt }].concat(st.history || []).slice(0, 20);
+    await this.saveAll();
+    return data;
+  }
+
+  /* 次流程：定向分析指定岗位（可选贴 JD） */
+  async analyze(role, jdText) {
+    const sm = this.jobLensInventory();
+    if (!sm.inventory) throw new Error('技能清单为空（先在本插件里重建技能矩阵并完成 AI 提炼）');
+    const sys = [
+      '你是资深技术招聘顾问，熟悉中国就业市场 2024-2026（注意：市场认知来自训练数据，非实时，结论保守）。',
+      '输入：目标岗位描述（可能附真实 JD）+ 候选人技能清单（每行 `技能名|方向|定级`）。',
+      '任务：给出该岗位的技能需求画像，并与候选人逐项比对。',
+      '只输出 JSON：',
+      '{"role_title":"岗位规范名","market_summary":"市场行情一句话(<=120字)",',
+      ' "demand":[{"skill":"技能","tier":"核心|常见|加分","note":"典型形态"}] (12~18条,按出现频率排序),',
+      ' "match_score":0到100,',
+      ' "strong":[{"skill":"","your_level":"","note":"简历可主打"}],',
+      ' "gaps":[{"skill":"","market_tier":"","your_level":"无|了解","priority":"P0|P1|P2","why":"","target":""}] (最多10条),',
+      ' "overqualified":["市场很少要求但候选人精通"],',
+      ' "learning_top5":[{"direction":"","why_market":"","target":"","related":""}] (恰好5条),',
+      ' "advice":"(<=80字)"}',
+    ].join('\n');
+    const user = '【目标岗位】' + role + (jdText ? '\n\n【真实 JD 原文（优先依据它）】\n' + jdText.slice(0, 3000) : '\n（未提供 JD，按市场通用画像分析）')
+      + '\n\n【候选人技能清单】\n' + sm.inventory;
+    const data = await this.callJobLensLLM(sys, user);
+    const st = this.jobLensState();
+    data.role_input = role;
+    data.generatedAt = Date.now();
+    data.refinedCount = sm.refinedCount;
+    st.lastRole = role;
+    st.history = [{ role: role, score: data.match_score, at: data.generatedAt }].concat(st.history || []).slice(0, 20);
+    await this.saveAll();
+    return data;
+  }
+
+  /* 报告写入插件目录 reports/ */
+  async saveReportMd(md, kind, role) {
+    const st = this.jobLensState();
+    const dir = normalizePath(this.manifest.dir + '/reports');
+    await this.app.vault.adapter.mkdir(dir).catch(() => {});
+    const date = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const ds = date.getFullYear() + pad(date.getMonth() + 1) + pad(date.getDate()) + '-' + pad(date.getHours()) + pad(date.getMinutes());
+    const safe = String(role || '').replace(/[\\/:*?"<>|]/g, '_').slice(0, 40);
+    const path = dir + '/' + kind + (safe ? '-' + safe : '') + '-' + ds + '.md';
+    await this.app.vault.adapter.write(path, md);
+    st.lastReportPath = path;
+    st.reportPaths = [path].concat(st.reportPaths || []).slice(0, 30);
+    await this.saveAll();
+    this.refreshViewIfOpen();
+    return path;
+  }
+
+  jobLensStamp(ts) {
+    const date = new Date(ts);
+    const pad = (n) => String(n).padStart(2, '0');
+    return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + ' ' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+  }
+
+  async buildDiscoverMd(data) {
+    const ds = this.jobLensStamp(data.generatedAt);
+    const tierIcon = { '直接可投': '✅', '补强后强': '🧱', '差异化蓝海': '💎' };
+    let md = '---\ntags: [求职, 岗位发现]\n---\n';
+    md += '# 岗位契合度分析（由技能矩阵反推）\n\n';
+    md += '> ' + ds + ' · 数据来源：模型市场知识（非实时）+ 技能矩阵 ' + (data.refinedCount || 0) + ' 簇 · 按契合度降序\n\n';
+    md += '## 市场环境\n' + (data.market_note || '') + '\n\n';
+    (data.roles || []).forEach((r) => {
+      md += '## ' + (tierIcon[r.tier] || '') + ' ' + r.role + ' — 契合度 ' + (r.fit == null ? '?' : r.fit) + '/100\n';
+      md += '- **契合理由**：' + (r.why || '') + '\n';
+      md += '- **匹配簇**：' + (r.matching || []).join('、') + '\n';
+      if ((r.missing_easy || []).length) md += '- **小缺口（容易补）**：' + r.missing_easy.join('、') + '\n';
+      if ((r.missing_hard || []).length) md += '- **大缺口**：' + r.missing_hard.join('、') + '\n';
+      md += '- **Boss 搜索词**：' + (r.search_keywords || []).map((k) => '`' + k + '`').join(' / ') + '\n';
+      if (r.salary_hint) md += '- **薪资参考**：' + r.salary_hint + '（仅供参考）\n';
+      md += '\n';
+    });
+    md += '## 建议\n' + (data.advice || '') + '\n';
+    return md;
+  }
+
+  async buildTargetedMd(data) {
+    const ds = this.jobLensStamp(data.generatedAt);
+    const tierIcon = { '核心': '🔴 核心', '常见': '🟡 常见', '加分': '🟢 加分' };
+    let md = '---\ntags: [求职, 岗位分析]\n---\n';
+    md += '# 岗位透镜 · ' + (data.role_title || data.role_input) + '\n\n';
+    md += '> ' + ds + ' · 匹配度 **' + (data.match_score == null ? '—' : data.match_score) + '/100** · 模型市场知识（非实时）+ 技能矩阵（' + (data.refinedCount || 0) + ' 簇）\n\n';
+    md += '## 市场概要\n' + (data.market_summary || '') + '\n\n';
+    md += '## 技能需求画像\n' + (data.demand || []).map((x) => '- ' + (tierIcon[x.tier] || x.tier) + ' **' + x.skill + '** — ' + (x.note || '')).join('\n') + '\n\n';
+    md += '## ✅ 优势（市场要 + 你强，简历主打）\n' + (data.strong || []).map((x) => '- **' + x.skill + '**（' + (x.your_level || '') + '）— ' + (x.note || '')).join('\n') + '\n\n';
+    md += '## 🔴 差距（市场要 + 你弱，按优先级）\n' + (data.gaps || []).map((x) => '- **[' + x.priority + '] ' + x.skill + '**（市场:' + (x.market_tier || '') + ' / 你:' + (x.your_level || '无') + '）— ' + (x.why || '') + ' → 目标: ' + (x.target || '')).join('\n') + '\n\n';
+    md += '## 🟡 市场少提但你精通（简历降权）\n' + (data.overqualified || []).map((x) => '- ' + x).join('\n') + '\n\n';
+    md += '## 🎯 学习方向 Top5\n' + (data.learning_top5 || []).map((x, i) =>
+      (i + 1) + '. **' + x.direction + '** — ' + (x.why_market || '') + '\n   达标: ' + (x.target || '') + (x.related ? '（衔接: ' + x.related + '）' : '')).join('\n') + '\n\n';
+    md += '## 建议\n' + (data.advice || '') + '\n';
+    return md;
+  }
+
+  async runDiscover(preferNote) {
+    const data = await this.discover(preferNote);
+    this._jobLensLastData = data;
+    const md = await this.buildDiscoverMd(data);
+    const path = await this.saveReportMd(md, '岗位契合度分析', '');
+    return { path: path, data: data };
+  }
+
+  async runTargeted(role, jdText) {
+    const data = await this.analyze(role, jdText);
+    this._jobLensLastData = data;
+    const md = await this.buildTargetedMd(data);
+    const path = await this.saveReportMd(md, '岗位分析', data.role_title || role);
+    return { path: path, data: data };
+  }
+
+  /* 导出缺口/学习方向为收件箱待办 */
+  async exportTodos() {
+    const data = this._jobLensLastData;
+    if (!data) { new Notice('请先重新运行一次分析（导出依赖本次会话的分析结果）'); return; }
+    const inbox = this.settings.jobLensInbox || DEFAULT_SETTINGS.jobLensInbox;
+    await this.app.vault.adapter.mkdir(normalizePath(inbox)).catch(() => {});
+    const now = new Date();
+    const pad = (p) => String(p).padStart(2, '0');
+    const stamp = '' + now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds()) + '000';
+    const tasks = [];
+    if (data.learning_top5) {
+      for (const x of data.learning_top5) tasks.push({ title: '学习-' + x.direction, why: x.why_market, target: x.target, extra: x.related ? '衔接: ' + x.related : '' });
+    } else if (data.roles) {
+      for (const r of data.roles) {
+        if (r.tier === '直接可投') continue;
+        for (const g of (r.missing_easy || [])) tasks.push({ title: '补缺-' + r.role + '-' + g, why: '解锁岗位: ' + r.role + '（契合度 ' + (r.fit == null ? '?' : r.fit) + '）', target: '', extra: '' });
+      }
+    }
+    let n = 0;
+    for (const t of tasks) {
+      const safe = String(t.title).replace(/[\\/:*?"<>|]/g, '_').slice(0, 50);
+      const fm = '---\nstatus: 🔴 undone\nvisibility: 🟢 open\nupdated: ' + stamp + '\nsource: 岗位透镜\nAI_tags: [学习计划]\nAI_summary_short: ' + String(t.why || '').slice(0, 80) + '\n---\n';
+      const body = '# ' + t.title + '\n\n> 市场依据: ' + (t.why || '') + '\n> 达标标准: ' + (t.target || '—') + (t.extra ? '\n> ' + t.extra : '') + '\n';
+      try {
+        await this.app.vault.create(normalizePath(inbox + '/' + safe + '.md'), fm + body);
+        n++;
+      } catch (e) { /* 同名跳过 */ }
+    }
+    new Notice('已导出 ' + n + ' 条待办到收件箱（待完成工作台可见）');
+  }
+
+  /* 一次性迁移：旧 job-lens 插件的 data.json 状态 + reports/*.md */
+  async migrateLegacyJobLens() {
+    const st = this.jobLensState();
+    if (st.migratedFromLegacy) return;
+    const legacyDir = '.obsidian/plugins/00_xyblue135-job-lens';
+    let legacy = null;
+    try {
+      legacy = JSON.parse(await this.app.vault.adapter.read(legacyDir + '/data.json'));
+    } catch (e) { /* 旧插件已删，跳过 */ }
+
+    const newDir = normalizePath(this.manifest.dir + '/reports');
+    const pathMap = {};
+    try {
+      await this.app.vault.adapter.mkdir(newDir).catch(() => {});
+      const listing = await this.app.vault.adapter.list(legacyDir + '/reports').catch(() => null);
+      for (const f of ((listing && listing.files) || [])) {
+        const name = String(f).split('/').pop();
+        const md = await this.app.vault.adapter.read(f).catch(() => null);
+        if (md == null) continue;
+        const target = newDir + '/' + name;
+        await this.app.vault.adapter.write(target, md).catch(() => {});
+        pathMap[f] = target;
+      }
+    } catch (e) { /* 迁移失败不阻塞加载 */ }
+
+    if (legacy) {
+      if (typeof legacy.inbox === 'string' && legacy.inbox.trim()
+        && (!this.settings.jobLensInbox || this.settings.jobLensInbox === DEFAULT_SETTINGS.jobLensInbox)) {
+        this.settings.jobLensInbox = legacy.inbox.trim();
+      }
+      if (typeof legacy.lastRole === 'string') st.lastRole = legacy.lastRole;
+      if (Array.isArray(legacy.history)) st.history = legacy.history.slice(0, 20);
+      const remap = (p) => {
+        if (!p) return '';
+        if (pathMap[p]) return pathMap[p];
+        const name = String(p).split('/').pop();
+        const hit = Object.values(pathMap).find((t) => String(t).split('/').pop() === name);
+        return hit || '';
+      };
+      st.reportPaths = (Array.isArray(legacy.reportPaths) ? legacy.reportPaths : [])
+        .map(remap).filter(Boolean).slice(0, 30);
+      st.lastReportPath = remap(legacy.lastReportPath) || st.reportPaths[0] || '';
+    }
+    st.migratedFromLegacy = true;
+    await this.saveAll();
+  }
+
   onunload() {
     // 事件由 registerEvent 自动清理
+    // 岗位透镜视图随插件卸载自动关闭，这里显式 detach 避免残留空 leaf
+    try {
+      this.app.workspace.getLeavesOfType(JOB_LENS_VIEW_TYPE).forEach((leaf) => leaf.detach());
+    } catch (e) { /* 忽略 */ }
   }
+}
+
+/* ==================== 岗位透镜：面板视图 + 输入 Modal ==================== */
+
+class JobLensView extends ItemView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this.plugin = plugin;
+    this.showPath = null;
+  }
+  getViewType() { return JOB_LENS_VIEW_TYPE; }
+  getDisplayText() { return '岗位透镜'; }
+  getIcon() { return 'compass'; }
+
+  async onOpen() {
+    this.contentEl.empty();
+    this.contentEl.addClass('xyjl-view');
+    const bar = this.contentEl.createDiv({ cls: 'xyjl-viewbar' });
+    this.titleEl = bar.createDiv({ cls: 'xyjl-viewtitle', text: '岗位透镜' });
+    const actions = bar.createDiv({ cls: 'xyjl-viewactions' });
+    actions.createEl('button', { cls: 'xyjl-btn', text: '＋ 新分析' }).addEventListener('click', () => this.plugin.openJobLensModal());
+    actions.createEl('button', { cls: 'xyjl-btn xyjl-btn-ghost', text: '导出待办' }).addEventListener('click', () => { void this.plugin.exportTodos(); });
+    actions.createEl('button', { cls: 'xyjl-btn xyjl-btn-ghost', text: '刷新' }).addEventListener('click', () => { void this.renderLatest(); });
+    this.bodyEl = this.contentEl.createDiv({ cls: 'xyjl-viewbody' });
+    await this.renderLatest();
+  }
+  async onClose() {
+    this.contentEl.empty();
+  }
+
+  async renderLatest() {
+    const st = this.plugin.jobLensState();
+    this.showPath = st.lastReportPath || (st.reportPaths || [])[0] || null;
+    await this.renderReport(this.showPath);
+  }
+
+  async renderReport(path) {
+    this.bodyEl.empty();
+    if (!path) {
+      this.titleEl.setText('岗位透镜');
+      this.bodyEl.createDiv({ cls: 'xyjl-hint', text: '还没有分析报告。点击右上角「＋ 新分析」，AI 会从你的技能矩阵反推最适合的岗位方向（需要 AI 网关在线）。' });
+      return;
+    }
+    try {
+      const md = await this.app.vault.adapter.read(path);
+      const name = path.split('/').pop();
+      this.titleEl.setText(name);
+      const paths = this.plugin.jobLensState().reportPaths || [];
+      if (paths.length > 1) {
+        const hist = this.bodyEl.createDiv({ cls: 'xyjl-history' });
+        for (const p of paths.slice(0, 8)) {
+          const n = p.split('/').pop();
+          const b = hist.createEl('button', { cls: 'xyjl-histbtn' + (p === path ? ' is-active' : ''), text: n });
+          b.addEventListener('click', () => { void this.renderReport(p); });
+        }
+      }
+      const mdBox = this.bodyEl.createDiv({ cls: 'xyjl-md' });
+      try {
+        await MarkdownRenderer.render(this.app, md, mdBox, path, this);
+      } catch (e) {
+        mdBox.setText(md);
+      }
+    } catch (e) {
+      this.bodyEl.createDiv({ cls: 'xyjl-hint', text: '报告读取失败：' + (e && e.message ? e.message : e) });
+    }
+  }
+}
+
+class JobLensModal extends Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl('h3', { text: '岗位透镜 · 新分析' });
+    contentEl.createDiv({ cls: 'xyjl-hint', text: '主分析：从你的技能矩阵反推最适合的岗位方向（零输入）。下方字段全部可选——填了定向岗位则改做定向分析，贴 JD 则优先按 JD。' });
+    let roleEl, jdEl, preferEl;
+    new Setting(contentEl).setName('候选人偏好（可选）').addTextArea((t) => {
+      preferEl = t;
+      t.inputEl.rows = 2;
+      t.inputEl.style.width = '100%';
+      t.setPlaceholder('如：不想上夜班 / 偏好杭州 / 只想投运维方向');
+    });
+    new Setting(contentEl).setName('定向岗位（可选）').addText((t) => {
+      roleEl = t;
+      t.inputEl.style.width = '100%';
+      t.setPlaceholder('如：DevOps 工程师（填了则改做定向分析）');
+      t.setValue(this.plugin.jobLensState().lastRole || '');
+    });
+    new Setting(contentEl).setName('真实 JD（可选）').addTextArea((t) => {
+      jdEl = t;
+      t.inputEl.rows = 4;
+      t.inputEl.style.width = '100%';
+      t.setPlaceholder('粘贴 Boss 等平台的 JD 原文，定向分析时优先依据');
+    });
+    const btns = contentEl.createDiv({ cls: 'xyjl-btns' });
+    const runBtn = btns.createEl('button', { cls: 'xyjl-btn', text: '开始分析（约 30~60 秒）' });
+    runBtn.addEventListener('click', async () => {
+      const role = roleEl.getValue().trim();
+      const jd = jdEl.getValue().trim();
+      const prefer = preferEl.getValue().trim();
+      runBtn.disabled = true;
+      const isTargeted = !!role;
+      runBtn.textContent = isTargeted ? '定向分析中…' : '岗位发现中…';
+      try {
+        if (isTargeted) await this.plugin.runTargeted(role, jd);
+        else await this.plugin.runDiscover(prefer);
+        new Notice('分析完成，报告已更新到面板', 5000);
+        this.close();
+        void this.plugin.activateView();
+      } catch (e) {
+        new Notice('分析失败：' + (e && e.message ? e.message : e), 10000);
+        runBtn.disabled = false;
+        runBtn.textContent = '开始分析（约 30~60 秒）';
+      }
+    });
+    btns.createEl('button', { cls: 'xyjl-btn xyjl-btn-ghost', text: '取消' }).addEventListener('click', () => this.close());
+  }
+  onClose() { this.contentEl.empty(); }
 }
 
 module.exports = SkillMinerPlugin;

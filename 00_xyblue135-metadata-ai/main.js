@@ -30,6 +30,9 @@ const {
   Setting,
   TFile,
   setIcon,
+  // 模板骨架（1.30 由原 00_xyblue135-docs-template 并入）需要这两个
+  normalizePath,
+  moment,
 } = require("obsidian");
 
 const DEFAULT_SUMMARY_SHORT_HARNESS = [
@@ -755,6 +758,33 @@ const FORMAT_CHECK_MIGRATION_REQUIRES_DEFAULT_HARNESS = {
   qa: "qaHarness",
 };
 
+/* ==================== 模板骨架（1.30 由原 00_xyblue135-docs-template 并入） ====================
+   作用：新建 / 移入白名单目录的笔记，自动补齐缺失的 frontmatter 字段。
+   与 AI 生成的区别：这里**纯静态、不调 AI**，只补「键」，值取模板里的默认值。
+   合并原因：字段清单原本在 docs-template 的设置里、字段顺序在 AI 元数据的设置里，
+   同一套 schema 定义两处；而且本插件 sidecar 的 create 监听（延迟 2500ms）本来就在
+   等 docs-template 先跑完，是一处隐式跨插件依赖，合并后变成内部调用。 */
+const DEFAULT_TEMPLATE_TEXT = [
+  "---",
+  "status: 🟢 done",
+  "visibility: 🟢 open",
+  "updated: {{timestamp}}",
+  "token_count: 0",
+  "AI_last_verified: ",
+  "AI_title: []",
+  "AI_tags: []",
+  "AI_freshness: ",
+  "AI_technical_depth: ",
+  "AI_freshness_note: ",
+  "AI_summary_short: ",
+  "AI_summary_long: ",
+  "AI_take: ",
+  "AI_qa: ",
+  "---",
+  "",
+  "",
+].join("\n");
+
 const DEFAULT_SETTINGS = {
   // 1.1：设置结构版本，用于只跑一次「旧默认校验规则 → 新默认校验规则」迁移。
   settingsVersion: SETTINGS_VERSION_FORMAT_CHECKS_ALIGNED,
@@ -824,6 +854,15 @@ const DEFAULT_SETTINGS = {
   // 否则 sidecar 会写到两个仓库之外（vault 根），既不进备份也搜不到。
   sidecarModeEnabled: false,
   metadataStoreFolder: "my_blog/00_metadata",
+
+  // ── 模板骨架（1.30 由原 00_xyblue135-docs-template 并入）──
+  // 新建 / 移入白名单目录的 .md 会自动补齐这里列出、而笔记里缺失的 frontmatter 字段。
+  // 已有字段的值与顺序一律不动，只追加缺失项。纯静态，不调 AI。
+  templateNote: DEFAULT_TEMPLATE_TEXT,
+  // 模板作用范围：只处理这些目录下的 .md（含子目录）。逗号或换行分隔；留空 = 整个仓库。
+  templateAuditFolders: "my_blog/00_docs",
+  templateAuditOnCreate: true,
+  templateAuditDelayMs: 1500,
 };
 
 const DEFAULT_STATE = {
@@ -1020,6 +1059,10 @@ module.exports = class AiMetadataPlugin extends Plugin {
     const savedSettings = saved.settings || saved;
     const savedState = saved.state || {};
     this.settings = Object.assign({}, DEFAULT_SETTINGS, savedSettings);
+
+    /* 模板骨架的定时器表：以「文件对象」为键而不是路径 ——
+       新建笔记常在几百毫秒内被重命名，用路径做键会在重命名后重新排队，旧定时器白跑一趟。 */
+    this.templateAudits = new Map();
 
     // v0.6.0：从单 summary 升级为 summary_short + summary_long。
     // 旧 summaryMaxChars <= 140 时视为“短摘要长度”；>= 180 时视为“长摘要长度”。
@@ -1274,6 +1317,46 @@ module.exports = class AiMetadataPlugin extends Plugin {
       callback: () => this.openMetadataGap(),
     });
 
+    /* ── 模板骨架（1.30 由原 00_xyblue135-docs-template 并入）──
+       命令 id 沿用原插件的 audit-current-note / audit-whitelist-notes 语义，
+       只是换到本插件命名空间下。 */
+    this.addCommand({
+      id: "template-audit-current-note",
+      name: "模板补全：审查并补全当前笔记的模板字段",
+      checkCallback: (checking) => {
+        const file = this.app.workspace.getActiveFile();
+        const eligible = !!(file && String(file.extension || "").toLowerCase() === "md" && this.isInTemplateScope(file));
+        if (!eligible) return false;
+        if (!checking) void this.auditTemplateAndFill(file, { notify: true });
+        return true;
+      },
+    });
+    this.addCommand({
+      id: "template-audit-whitelist-notes",
+      name: "模板补全：审查并补全白名单内全部笔记",
+      callback: () => { void this.runBulkTemplateAudit(); },
+    });
+
+    // 新建 / 移入白名单目录的笔记：延迟一拍补齐缺失字段（给 Obsidian 一点时间完成写入与索引）。
+    this.registerEvent(this.app.vault.on("create", (file) => {
+      if (this.settings.templateAuditOnCreate !== true) return;
+      if (!(file instanceof TFile)) return;
+      if (String(file.extension || "").toLowerCase() !== "md") return;
+      if (!this.isInTemplateScope(file)) return;
+      this.scheduleTemplateAudit(file);
+    }));
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
+      if (!(file instanceof TFile)) return;
+      if (String(file.extension || "").toLowerCase() !== "md") return;
+      if (this.templateAudits && this.templateAudits.has(file)) {
+        this.scheduleTemplateAudit(file);
+        return;
+      }
+      if (this.settings.templateAuditOnCreate === true && this.isInTemplateScope(file)) {
+        if (!oldPath || !this.isInTemplateScope({ path: oldPath })) this.scheduleTemplateAudit(file);
+      }
+    }));
+
     this.app.workspace.onLayoutReady(() => {
       this.layoutReady = true;
       this.startObserver();
@@ -1312,7 +1395,7 @@ module.exports = class AiMetadataPlugin extends Plugin {
     this.registerEvent(this.app.vault.on("create", (file) => {
       if (!this.layoutReady || !this.sidecarModeEnabled()) return;
       if (!(file instanceof TFile) || file.extension !== "md" || !this.isWhitelisted(file)) return;
-      // 延迟一拍：等 docs-template 审计把正文 frontmatter 写完；ensureSidecar 幂等。
+      // 延迟一拍：等模板补全把正文 frontmatter 写完；ensureSidecar 幂等。
       window.setTimeout(() => {
         void this.ensureSidecar(file).catch((error) => console.error("[metadata-ai] sidecar 创建失败", error));
       }, 2500);
@@ -2899,6 +2982,355 @@ module.exports = class AiMetadataPlugin extends Plugin {
 
   openMetadataGap() {
     new MetadataGapModal(this.app, this).open();
+  }
+
+  /* ==================== 模板骨架：审查 / 补全（1.30 由原 00_xyblue135-docs-template 并入） ====================
+     原则与原插件一致：
+       1. 只追加模板里存在、而笔记里缺失的字段，绝不改写已有字段的值与顺序；
+       2. 已有值即使是空字符串也不动（视为用户有意留空）；
+       3. 完全没有 frontmatter 的笔记，把整块模板 frontmatter 补在正文最前面；
+       4. 笔记正在编辑器里打开时改编辑器缓冲区（而不是磁盘），避免与未落盘的输入互相覆盖。 */
+
+  /** 解析模板作用范围（逗号或换行分隔，去掉首尾斜杠与 ./，统一小写以兼容 Windows 大小写）。 */
+  getTemplateAuditRoots() {
+    return String(this.settings.templateAuditFolders || "")
+      .split(/[,，\n]/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((item) => normalizePath(item).replace(/^\.\//, "").replace(/^\/+|\/+$/g, "").toLowerCase())
+      .filter(Boolean);
+  }
+
+  /** 判断某篇笔记是否在模板作用范围内；留空表示整个仓库。 */
+  isInTemplateScope(file) {
+    const roots = this.getTemplateAuditRoots();
+    if (!roots.length) return true;
+    const path = normalizePath(String(file && file.path ? file.path : ""))
+      .replace(/^\/+/, "")
+      .toLowerCase();
+    return roots.some((root) => path === root || path.startsWith(`${root}/`));
+  }
+
+  /** 找到正在显示指定笔记的 Markdown 视图（没打开时返回 null）。 */
+  getTemplateOpenMarkdownView(file) {
+    const leaves = this.app.workspace.getLeavesOfType("markdown");
+    for (const leaf of leaves) {
+      const view = leaf && leaf.view;
+      if (view && view.file && view.file.path === file.path && view.editor) return view;
+    }
+    return null;
+  }
+
+  /** 笔记创建后延迟审查，避免与 Obsidian 的写入 / 索引过程抢跑。 */
+  scheduleTemplateAudit(file, attempt = 0) {
+    if (!this.templateAudits) this.templateAudits = new Map();
+    const previous = this.templateAudits.get(file);
+    if (previous) window.clearTimeout(previous.timer);
+    const delay = Math.max(300, Number(this.settings.templateAuditDelayMs) || 1500);
+    const timer = window.setTimeout(() => {
+      this.templateAudits.delete(file);
+      void this.runScheduledTemplateAudit(file, attempt);
+    }, delay);
+    this.templateAudits.set(file, { timer, attempt });
+  }
+
+  /** 定时器到点后的实际动作：对象仍在才继续；正在输入时最多顺延 8 轮。 */
+  async runScheduledTemplateAudit(file, attempt) {
+    const latest = this.app.vault.getAbstractFileByPath(file.path);
+    if (!(latest instanceof TFile)) {
+      console.warn("[metadata-ai] 模板补全：定时器找不到文件，已跳过：", file.path);
+      return;
+    }
+    // 「正在输入就顺延」的保护不能误伤「刚新建、缓冲区还是空的」——那正是最该补字段的时刻。
+    if (attempt < 8 && this.getTemplateOpenMarkdownView(latest)
+      && !this.isTemplateFieldsComplete(latest) && !this.isEditorEffectivelyEmpty(latest)) {
+      this.scheduleTemplateAudit(latest, attempt + 1);
+      return;
+    }
+    await this.auditTemplateAndFill(latest, { notify: true, silentWhenClean: true });
+  }
+
+  /** 编辑器里的内容是否已经写全模板字段（用于决定还要不要让一轮）。 */
+  isTemplateFieldsComplete(file) {
+    const fields = this.buildTemplateFields(file);
+    if (!fields.length) return true;
+    const view = this.getTemplateOpenMarkdownView(file);
+    if (!view) return false;
+    const split = this.splitFrontmatter(view.editor.getValue());
+    const keys = new Set(split ? split.keys : []);
+    return fields.every((field) => keys.has(field.key));
+  }
+
+  /** 缓冲区是否还是「空壳」（内容全是空白）。 */
+  isEditorEffectivelyEmpty(file) {
+    const view = this.getTemplateOpenMarkdownView(file);
+    if (!view) return true;
+    return String(view.editor.getValue() ?? "").trim() === "";
+  }
+
+  /** 审查单篇笔记并补全缺失的模板字段。 */
+  async auditTemplateAndFill(file, options = {}) {
+    const notify = options.notify === true;
+    const silentWhenClean = options.silentWhenClean === true;
+    const fields = this.buildTemplateFields(file);
+    if (!fields.length) {
+      if (notify) new Notice("模板里没有可用的 frontmatter 字段，请先在设置中完善模板");
+      return { added: 0, createdBlock: false };
+    }
+    let added = 0;
+    let createdBlock = false;
+    let unclosed = false;
+    try {
+      const view = this.getTemplateOpenMarkdownView(file);
+      if (view) {
+        const buffer = view.editor.getValue();
+        const result = this.mergeTemplateFields(buffer, fields);
+        if (result.unclosed) {
+          unclosed = true;
+        } else if (result.insert) {
+          added = result.added;
+          createdBlock = result.createdBlock;
+          const pos = this.offsetToEditorPos(buffer, result.insert.offset);
+          view.editor.replaceRange(result.insert.text, pos);
+        }
+      } else {
+        await this.app.vault.process(file, (data) => {
+          const result = this.mergeTemplateFields(data, fields);
+          if (result.unclosed) { unclosed = true; return data; }
+          if (!result.insert) return data;
+          added = result.added;
+          createdBlock = result.createdBlock;
+          return `${data.slice(0, result.insert.offset)}${result.insert.text}${data.slice(result.insert.offset)}`;
+        });
+      }
+    } catch (error) {
+      console.error("[metadata-ai] 模板补全失败：", file.path, error);
+      if (notify) new Notice(`补全失败：${file.path}`);
+      return { added: 0, createdBlock: false, error };
+    }
+    if (unclosed && notify) new Notice(`frontmatter 没有闭合，已跳过：${file.basename}`);
+    if (notify && !unclosed) {
+      if (added > 0) {
+        new Notice(createdBlock ? `已补全元数据块：${file.basename}` : `已补全 ${added} 个元数据字段：${file.basename}`);
+      } else if (!silentWhenClean) {
+        new Notice("该笔记的模板字段已完整，无需补全");
+      }
+    }
+    return { added, createdBlock, unclosed };
+  }
+
+  /**
+   * 纯函数：把模板字段合并进一段文本。
+   * 只计算出「插入位置」和「要插入的文本」，其余内容（BOM、行尾、正文）保持原样，
+   * 这样同一套逻辑既能作用于磁盘内容（vault.process），也能作用于编辑器缓冲区。
+   */
+  mergeTemplateFields(text, fields) {
+    const source = String(text ?? "");
+    const eol = /\r\n/.test(source) ? "\r\n" : "\n";
+    const split = this.splitFrontmatter(source);
+    if (!split) {
+      // 只有开头的 --- 却没有闭合 ---：用户正写到一半，不能硬塞整块模板。
+      if (/^\uFEFF?---[ \t]*(?:\r?\n|$)/.test(source)) {
+        return { added: 0, createdBlock: false, insert: null, unclosed: true };
+      }
+      return {
+        added: fields.length,
+        createdBlock: true,
+        insert: { offset: 0, text: this.buildFrontmatterBlock(fields, eol) },
+        unclosed: false,
+      };
+    }
+    const existing = new Set(split.keys);
+    const missing = fields.filter((field) => !existing.has(field.key));
+    if (!missing.length) return { added: 0, createdBlock: false, insert: null, unclosed: false };
+    const lines = missing.map((field) => this.formatTemplateFieldLine(field).replace(/\n/g, eol));
+    const joined = lines.join(eol);
+    const bodyEmpty = split.body.trim().length === 0;
+    return {
+      added: missing.length,
+      createdBlock: false,
+      insert: {
+        offset: bodyEmpty ? split.prefix.length : split.prefix.length + split.body.length,
+        text: bodyEmpty ? `${joined}${eol}` : `${eol}${joined}`,
+      },
+      unclosed: false,
+    };
+  }
+
+  /** 把字符偏移量换算成编辑器坐标（CodeMirror 用行 / 列定位）。 */
+  offsetToEditorPos(text, offset) {
+    const safe = Math.max(0, Math.min(offset, text.length));
+    const before = text.slice(0, safe);
+    const lastBreak = before.lastIndexOf("\n");
+    return { line: (before.match(/\n/g) || []).length, ch: safe - lastBreak - 1 };
+  }
+
+  /** 单行字段：有值写 `key: value`，空的写 `key:`。多行值必须从下一行开始。 */
+  formatTemplateFieldLine(field) {
+    if (!field.text) return `${field.key}:`;
+    if (/^[ \t]/.test(field.text)) return `${field.key}:\n${field.text}`;
+    return `${field.key}: ${field.text}`;
+  }
+
+  /** 批量审查作用范围内的全部笔记（先弹确认框）。 */
+  async runBulkTemplateAudit() {
+    const roots = this.getTemplateAuditRoots();
+    const files = this.app.vault.getMarkdownFiles().filter((file) => this.isInTemplateScope(file));
+    if (!files.length) { new Notice("作用目录内没有 Markdown 笔记"); return; }
+    const scopeText = roots.length ? roots.join("、") : "整个仓库";
+    new TemplateAuditConfirmModal(this.app, `将审查 ${files.length} 篇笔记（${scopeText}）。只会追加缺失的 frontmatter 字段，不改动已有字段的值、顺序与正文。建议先在 Git 中提交当前改动，便于回滚。`, async () => {
+      let changed = 0;
+      let fieldsAdded = 0;
+      let blocksCreated = 0;
+      const startedAt = Date.now();
+      for (const file of files) {
+        const result = await this.auditTemplateAndFill(file, { notify: false });
+        if (result.added > 0) {
+          changed += 1;
+          fieldsAdded += result.added;
+          if (result.createdBlock) blocksCreated += 1;
+        }
+      }
+      const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
+      new Notice(`审查完成：共 ${files.length} 篇，补全 ${changed} 篇（新增 ${fieldsAdded} 个字段，新建元数据块 ${blocksCreated} 篇），耗时 ${seconds}s`, 8000);
+    }).open();
+  }
+
+  /**
+   * 把设置里的模板解析成 [{key, text}] 形式的字段列表（变量已渲染）。
+   * 按「缩进续行」整体取字段，因此块标量（| / >）、多行列表、嵌套 map 都不会被拆坏。
+   */
+  buildTemplateFields(file) {
+    const template = String(this.settings.templateNote || "");
+    const match = template.match(/^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/);
+    const body = match ? match[1] : "";
+    if (!body.trim()) return [];
+    const parent = file.parent;
+    const now = moment();
+    const variables = {
+      folder: parent && parent.path ? parent.name : this.app.vault.getName(),
+      filename: file.basename,
+      path: parent ? parent.path : "",
+      datetime: now.format("YYYY-MM-DDTHH"),
+      date: now.format("YYYY-MM-DD"),
+      time: now.format("HH:mm"),
+      timestamp: now.format("YYYYMMDDHHmmssSSS"),
+    };
+    const variablePattern = /\{\{(folder|filename|path|datetime|date|time|timestamp)\}\}/g;
+    const fields = [];
+    const seen = new Set();
+    const lines = body.split(/\r?\n/);
+    for (let index = 0; index < lines.length; index += 1) {
+      const fieldMatch = lines[index].match(/^([A-Za-z0-9_\-\u4e00-\u9fa5]+):(.*)$/);
+      if (!fieldMatch) continue;
+      const key = fieldMatch[1];
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const rawValue = fieldMatch[2].trim();
+      const continuation = [];
+      while (index + 1 < lines.length && /^[ \t]+\S/.test(lines[index + 1])) {
+        index += 1;
+        continuation.push(lines[index]);
+      }
+      if (continuation.length || /^[|>][+-]?$/.test(rawValue)) {
+        const rendered = continuation
+          .map((line) => line.replace(variablePattern, (_all, name) => variables[name] ?? ""))
+          .join("\n");
+        fields.push({ key, text: rawValue ? `${rawValue}\n${rendered}` : rendered });
+        continue;
+      }
+      // 整个值就是一个变量时按字符串整体转义，避免时间戳被当成天文数字。
+      const variableOnly = rawValue.match(/^\{\{(folder|filename|path|datetime|date|time|timestamp)\}\}$/);
+      if (variableOnly) {
+        fields.push({ key, text: this.toYamlString(variables[variableOnly[1]] ?? "") });
+        continue;
+      }
+      const rendered = rawValue.replace(variablePattern, (_all, name) => variables[name] ?? "");
+      fields.push({ key, text: this.toYamlText(this.parseYamlScalar(rendered)) });
+    }
+    return fields;
+  }
+
+  toYamlString(value) {
+    return JSON.stringify(value);
+  }
+
+  /** 把模板里的一小段文本还原成合适的 JS 值（数组 / 数字 / 布尔 / 字符串）。 */
+  parseYamlScalar(text) {
+    const raw = String(text ?? "").trim();
+    if (!raw) return "";
+    // 纯数字自己处理：YAML 会把 17 位时间戳解析成浮点并丢掉精度。
+    if (/^-?\d+$/.test(raw)) return String(Number(raw)) === raw ? Number(raw) : raw;
+    // 含 # 的值不交给 YAML，免得被当成行内注释截断。
+    if (raw.indexOf("#") === -1) {
+      try {
+        const parsed = parseYaml(`value: ${raw}`);
+        if (parsed && Object.prototype.hasOwnProperty.call(parsed, "value")) {
+          const value = parsed.value;
+          if (value instanceof Date) return raw.replace(/^['"]/, "").replace(/['"]$/, "");
+          if (value !== undefined) return value;
+        }
+      } catch (error) { /* 解析失败走下面的手工兜底 */ }
+    }
+    if (/^'(.*)'$/.test(raw)) return raw.slice(1, -1);
+    return raw;
+  }
+
+  /** 把 JS 值写回 YAML 文本；空值写成 `key:`，保持与原模板一致。 */
+  toYamlText(value) {
+    if (value === null || value === undefined) return "";
+    if (Array.isArray(value) || typeof value === "object") return JSON.stringify(value);
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    const text = String(value);
+    if (!text.trim()) return "";
+    if (/^\d{4}-\d{2}-\d{2}(?:[T ].*)?$/.test(text)) return JSON.stringify(text);
+    if (/^-?\d+(?:\.\d+)?$/.test(text) && String(Number(text)) !== text) return JSON.stringify(text);
+    if (/^[A-Za-z0-9\u4e00-\u9fa5][A-Za-z0-9\u4e00-\u9fa5 _\-./]*$/.test(text)) return text;
+    return JSON.stringify(text);
+  }
+
+  /** 生成一整块 frontmatter（用于完全没有元数据的笔记）。 */
+  buildFrontmatterBlock(fields, eol = "\n") {
+    const lines = fields.map((field) => this.formatTemplateFieldLine(field).replace(/\n/g, eol));
+    return `---${eol}${lines.join(eol)}${eol}---${eol}${eol}`;
+  }
+
+  /** 拆出笔记的 frontmatter。返回 { prefix, body, suffix, rest, keys }，无法识别时返回 null。 */
+  splitFrontmatter(data) {
+    const text = String(data ?? "");
+    // BOM 归到 prefix 里：这样 mergeTemplateFields 计算偏移量时不会把它算丢。
+    const match = text.match(/^(\uFEFF?---[ \t]*\r?\n)([\s\S]*?)(\r?\n---[ \t]*(?:\r?\n|$))/);
+    if (match) {
+      return {
+        prefix: match[1],
+        body: match[2],
+        suffix: match[3],
+        rest: text.slice(match[0].length),
+        keys: this.collectFrontmatterKeys(match[2]),
+      };
+    }
+    // 空 frontmatter 块（--- 紧跟 ---）单独处理，避免被当成「没有 frontmatter」。
+    const emptyBlock = text.match(/^(\uFEFF?---[ \t]*\r?\n)(---[ \t]*(?:\r?\n|$))/);
+    if (emptyBlock) {
+      return {
+        prefix: emptyBlock[1],
+        body: "",
+        suffix: `\n${emptyBlock[2]}`,
+        rest: text.slice(emptyBlock[0].length),
+        keys: [],
+      };
+    }
+    return null;
+  }
+
+  /** 收集 frontmatter 里的一级字段名（模板里的字段都是平铺的）。 */
+  collectFrontmatterKeys(body) {
+    const keys = [];
+    for (const line of String(body || "").split(/\r?\n/)) {
+      const keyMatch = line.match(/^([A-Za-z0-9_\-\u4e00-\u9fa5]+):/);
+      if (keyMatch) keys.push(keyMatch[1]);
+    }
+    return keys;
   }
 
   // 设置页各模块说明用：把「校验目标 + 语法 + 当前规则数」讲清楚，方便对照提示词。
@@ -5375,6 +5807,61 @@ class AiMetadataSettingTab extends PluginSettingTab {
         new TagCaseCleanupModal(this.app, this.plugin).open();
       }));
 
+    containerEl.createEl("h3", { text: "模板骨架（新建笔记自动补字段）" });
+    containerEl.createEl("p", {
+      cls: "setting-item-description",
+      text: "这是「一篇笔记该有哪些 frontmatter 字段」的唯一定义处。新建或移入作用目录的 .md 会自动补齐这里列出、而笔记里缺失的字段；"
+        + "已有字段的值与顺序一律不动，只追加缺失项。纯静态操作，不调用 AI、不改正文。",
+    });
+    new Setting(containerEl)
+      .setName("Frontmatter 模板")
+      .setDesc("写成 --- 包裹的 YAML 块。支持变量：{{folder}} {{filename}} {{path}} {{datetime}} {{date}} {{time}} {{timestamp}}。改完可点下方「审查并补全白名单内全部笔记」给历史笔记补齐。")
+      .addTextArea((area) => {
+        area.inputEl.rows = 16;
+        area.inputEl.style.width = "100%";
+        area.inputEl.style.fontFamily = "var(--font-monospace)";
+        area.setValue(this.plugin.settings.templateNote || "");
+        area.onChange(async (value) => {
+          this.plugin.settings.templateNote = value;
+          await this.plugin.saveAllData();
+        });
+      })
+      .addExtraButton((button) => button.setIcon("rotate-ccw").setTooltip("恢复默认模板")
+        .onClick(async () => {
+          this.plugin.settings.templateNote = DEFAULT_TEMPLATE_TEXT;
+          await this.plugin.saveAllData();
+          this.display();
+        }));
+    new Setting(containerEl)
+      .setName("作用目录")
+      .setDesc("只处理这些目录下的 .md（含子目录）。多个目录用逗号或换行分隔；留空 = 整个仓库。")
+      .addText((text) => text
+        .setPlaceholder("my_blog/00_docs")
+        .setValue(this.plugin.settings.templateAuditFolders || "")
+        .onChange(async (value) => {
+          this.plugin.settings.templateAuditFolders = value;
+          await this.plugin.saveAllData();
+        }));
+    new Setting(containerEl)
+      .setName("新建笔记时自动补全")
+      .setDesc("关闭后只能手动跑命令补全。观察到的笔记正在输入时会自动顺延，不覆盖你正在写的内容。")
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.templateAuditOnCreate !== false)
+        .onChange(async (value) => {
+          this.plugin.settings.templateAuditOnCreate = value;
+          await this.plugin.saveAllData();
+        }));
+    new Setting(containerEl)
+      .setName("补全延迟（毫秒）")
+      .setDesc("新建笔记后等多久再审查，给 Obsidian 留出写入与索引的时间。默认 1500。")
+      .addText((text) => text
+        .setValue(String(this.plugin.settings.templateAuditDelayMs ?? 1500))
+        .onChange(async (value) => {
+          const parsed = Number(value);
+          this.plugin.settings.templateAuditDelayMs = Number.isFinite(parsed) && parsed >= 300 ? parsed : 1500;
+          await this.plugin.saveAllData();
+        }));
+
     containerEl.createEl("h3", { text: "界面状态" });
     new Setting(containerEl)
       .setName("显示 AI 状态")
@@ -5888,6 +6375,30 @@ class AiMetadataSettingTab extends PluginSettingTab {
 //   2) 勾选（或全选 + 「本次处理数量」）后点「补全并排序」：
 //      逐篇先本地摆正顺序 → 只重新生成缺的/空的那个字段 → 再摆一次顺序 → 二次验证；
 //   3) 不重复运行，仍不合格的留给人工检查。
+/** 模板批量补全前的确认弹窗（1.30 由原 docs-template 的 AuditConfirmModal 并入）。 */
+class TemplateAuditConfirmModal extends Modal {
+  constructor(app, message, onConfirm) {
+    super(app);
+    this.message = message;
+    this.onConfirm = onConfirm;
+  }
+  onOpen() {
+    this.titleEl.setText("审查并补全元数据");
+    this.contentEl.createEl("p", { text: this.message });
+    new Setting(this.contentEl)
+      .addButton((button) => { button.setButtonText("取消").onClick(() => this.close()); })
+      .addButton((button) => {
+        button.setButtonText("开始补全").setCta().onClick(() => {
+          this.close();
+          void this.onConfirm();
+        });
+      });
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
 class MetadataGapModal extends Modal {
   constructor(app, plugin) {
     super(app);

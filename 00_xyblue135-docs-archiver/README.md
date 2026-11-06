@@ -49,8 +49,8 @@ cp data.example.json data.json
 
 本插件需要填的凭证字段：`apiKey`。
 
-> 字段名与库内其它 AI 插件（`ai-search` / `interview-rag` / `metadata-ai` /
-> `skill-miner`）统一为 `baseUrl` / `apiKey` / `model`，五处填一样的值即可。
+> 字段名与库内其它 AI 插件（`ai-search` / `metadata-ai` / `skill-miner`）
+> 统一为 `baseUrl` / `apiKey` / `model`，四处填一样的值即可。
 >
 > **1.0.3 之前**用的是 `aiBaseUrl` / `aiApiKey` / `aiModel`。插件加载时会自动
 > 迁移旧键并回写 `data.json`，**不需要手动改**；本次升级已提前迁移完毕。

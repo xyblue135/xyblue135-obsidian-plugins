@@ -14,18 +14,17 @@ const obsidian_1 = require("obsidian");
 const HUB_LABEL = "打开启动台";
 const SELF_ID = "00_xyblue135-launcher";
 
-/* 自研插件注册表：icon=lucide 图标, group=分区, open=主入口命令id, openLabel=主按钮文案 */
+/* 自研插件注册表：icon=lucide 图标, group=分区, open=主入口命令id, openLabel=主按钮文案
+   2026-11 合并后共 14 项：岗位透镜→技能提炼、元数据补全→AI 元数据、面试检索→AI 检索，
+   名称里带上原插件名，方便按老记忆找到入口。 */
 const PLUGIN_REGISTRY = [
-    { name: "AI 检索", id: "00_xyblue135-ai-search", icon: "search", group: "AI 学习·面试", openLabel: "打开检索", open: "00_xyblue135-ai-search:open-ai-search" },
-    { name: "AI 元数据", id: "00_xyblue135-metadata-ai", icon: "tags", group: "AI 学习·面试", openLabel: "待更新面板", open: "00_xyblue135-metadata-ai:open-pending-notes-dashboard" },
+    { name: "AI 检索 / 面试问答", id: "00_xyblue135-ai-search", icon: "search", group: "AI 学习·面试", openLabel: "打开检索", open: "00_xyblue135-ai-search:open-ai-search" },
+    { name: "AI 元数据 / 模板补全", id: "00_xyblue135-metadata-ai", icon: "tags", group: "AI 学习·面试", openLabel: "待更新面板", open: "00_xyblue135-metadata-ai:open-pending-notes-dashboard" },
     { name: "视频分诊", id: "00_xyblue135-video-triage", icon: "monitor-play", group: "AI 学习·面试", openLabel: "打开面板", open: "00_xyblue135-video-triage:open" },
     { name: "待完成工作台", id: "00_xyblue135-undone-workbench", icon: "list-todo", group: "AI 学习·面试", openLabel: "打开工作台", open: "00_xyblue135-undone-workbench:open" },
     { name: "归档推荐", id: "00_xyblue135-docs-archiver", icon: "archive", group: "AI 学习·面试", openLabel: "归档当前笔记", open: "00_xyblue135-docs-archiver:archive-current-note" },
     { name: "知识库导航图", id: "00_xyblue135-docs-nav", icon: "git-fork", group: "AI 学习·面试", openLabel: "打开导航图", open: "00_xyblue135-docs-nav:open" },
-    { name: "技能提炼", id: "00_xyblue135-skill-miner", icon: "briefcase", group: "AI 学习·面试", openLabel: "打开面板", open: "00_xyblue135-skill-miner:open-skill-miner" },
-    { name: "岗位透镜", id: "00_xyblue135-job-lens", icon: "compass", group: "AI 学习·面试", openLabel: "打开面板", open: "00_xyblue135-job-lens:open" },
-    { name: "面试耳返控制台", id: "00_xyblue135-interview-rag", icon: "graduation-cap", group: "AI 学习·面试", openLabel: "打开控制台", open: "00_xyblue135-interview-rag:interview-test-search" },
-    { name: "元数据补全", id: "00_xyblue135-docs-template", icon: "clipboard-check", group: "工具", openLabel: "批量审查", open: "00_xyblue135-docs-template:audit-whitelist-notes" },
+    { name: "技能提炼 / 岗位透镜", id: "00_xyblue135-skill-miner", icon: "briefcase", group: "AI 学习·面试", openLabel: "打开面板", open: "00_xyblue135-skill-miner:open-skill-miner" },
     { name: "Token 统计", id: "00_xyblue135-char-count-updater", icon: "hash", group: "工具", openLabel: null, open: null },
     { name: "附件镜像", id: "00_xyblue135-mirror", icon: "images", group: "工具", openLabel: "检查重名", open: "00_xyblue135-mirror:check-duplicate-notes" },
     { name: "文件 Logo", id: "00_xyblue135-docs-logo", icon: "sticker", group: "工具", openLabel: "重载白名单", open: "00_xyblue135-docs-logo:reload-whitelist-and-icons" },

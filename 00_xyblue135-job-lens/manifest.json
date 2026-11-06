@@ -1,9 +1,0 @@
-{
-  "id": "00_xyblue135-job-lens",
-  "name": "xyblue135 · 岗位透镜",
-  "version": "0.1.1",
-  "minAppVersion": "1.5.0",
-  "description": "【xyblue135 开源插件】输入目标岗位（可选粘贴真实 JD），AI 结合中国市场行情（模型知识，非实时数据）生成技能需求画像，与「技能提炼」的技能矩阵比对：匹配度评分、四象限分析（市场要×你强 / 市场要×你弱…）、学习方向 Top5，一键导出为收件箱待办笔记。",
-  "author": "xyblue135",
-  "isDesktopOnly": false
-}

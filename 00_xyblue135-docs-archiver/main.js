@@ -20,8 +20,8 @@ const DEFAULT_SETTINGS = {
 	notesRoot: 'my_blog/00_docs',
 	assetsRoot: 'my_blog/00_assets',
 	aiEnabled: true,
-	// 以下三个字段名与库内其它 AI 插件（ai-search / interview-rag /
-	// metadata-ai / skill-miner）保持一致：baseUrl / apiKey / model。
+	// 以下三个字段名与库内其它 AI 插件（ai-search / metadata-ai /
+	// skill-miner）保持一致：baseUrl / apiKey / model。
 	baseUrl: 'http://127.0.0.1:31415/v1',
 	// 密钥不写进源码：真实值放在 data.json，这样拷贝/发布 main.js 不会连带泄露 key。
 	apiKey: '',

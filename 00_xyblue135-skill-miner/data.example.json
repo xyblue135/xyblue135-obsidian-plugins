@@ -12,6 +12,7 @@
     "ignoreTags": "",
     "outputFolder": "my_blog/不受监管的文档/00_暂未分类",
     "interviewCount": 5,
+    "jobLensInbox": "my_blog/00_docs/收件箱",
     "resumeAppendixEnabled": true,
     "searchProvider": "off",
     "searchApiKey": "",

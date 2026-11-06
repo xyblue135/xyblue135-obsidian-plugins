@@ -1,9 +1,0 @@
-{
-  "id": "00_xyblue135-docs-template",
-  "name": "xyblue135 · 元数据补全",
-  "version": "1.5.3",
-  "minAppVersion": "1.5.0",
-  "description": "【xyblue135 开源插件】用 Obsidian 原生方式新建 .md 后，自动审查白名单目录（默认 00_docs）并只追加缺失的 frontmatter 字段，不改动已有内容；不做新建笔记入口，支持批量补全历史笔记。",
-  "author": "xyblue135",
-  "isDesktopOnly": false
-}

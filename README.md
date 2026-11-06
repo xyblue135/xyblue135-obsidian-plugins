@@ -1,6 +1,6 @@
 # xyblue135-obsidian-plugins
 
-xyblue135 的 Obsidian 插件合集（自研 17 个 + 打包的第三方 6 个）。
+xyblue135 的 Obsidian 插件合集（自研 14 个 + 打包的第三方 6 个）。
 
 > **仓库根 = `<vault>/.obsidian/plugins/`**，也就是「要备份的东西本身」。
 > 克隆下来直接放进 vault 的 `.obsidian/plugins/` 即可，插件可以原样加载。
@@ -14,7 +14,7 @@ xyblue135 的 Obsidian 插件合集（自研 17 个 + 打包的第三方 6 个�
 <vault>/
 ├── .obsidian/
 │   ├── plugins/             # ← 本仓库（仓库根）
-│   │   ├── 00_xyblue135-*/  # 自研插件（17 个）
+│   │   ├── 00_xyblue135-*/  # 自研插件（14 个）
 │   │   ├── <第三方插件>/     # 打包进来的社区插件（6 个）
 │   │   ├── .gitignore
 │   │   └── README.md        # 就是本文件
@@ -34,23 +34,33 @@ xyblue135 的 Obsidian 插件合集（自研 17 个 + 打包的第三方 6 个�
 
 | 插件 | 版本 | 说明 |
 |---|---|---|
-| `00_xyblue135-ai-search` | 0.3.4 | 本地召回 + AI 精排两阶段检索白名单文章，支持语义向量召回、标签/深度过滤、流式 AI 问答与引用跳转 |
+| `00_xyblue135-ai-search` | 1.0.0 | 本地召回 + AI 精排两阶段检索白名单文章，支持语义向量召回、标签/深度过滤、流式 AI 问答与引用跳转；**含面试问答模式**（ragfile 桥接 + 第一人称直答） |
 | `00_xyblue135-char-count-updater` | 4.1.3 | 按白名单更新 `token_count` 字段，中英文分倍率粗略估算 |
 | `00_xyblue135-docs-archiver` | 1.0.3 | 为 `my_blog/00_docs` 下笔记推荐归档文件夹：AI 推荐为主，本地打分兜底；一键移动 |
 | `00_xyblue135-docs-logo` | 1.0.3 | 仅对白名单目录显示状态图标，支持文件夹 / Markdown / 自定义 SVG |
 | `00_xyblue135-docs-nav` | 0.3.2 | 五种交互视图浏览知识库：技能树、树状图、旭日图、矩形树图、标签星图（ECharts 内置） |
-| `00_xyblue135-docs-template` | 1.5.3 | 新建 .md 后自动审查白名单目录，只追加缺失的 frontmatter 字段 |
 | `00_xyblue135-files-hider` | 1.0.1 | 右键视觉隐藏指定文件夹，不影响搜索与其他插件访问 |
 | `00_xyblue135-image-zoom` | 1.4.3 | Shift + 滚轮临时调整正文图片尺寸，并提供可配置相框 |
-| `00_xyblue135-interview-rag` | 0.3.3 | 面试专用：监听 OBS 转写桥接，秒级本地加权召回 + AI 组织回答悬浮卡 |
-| `00_xyblue135-job-lens` | 0.1.1 | 输入目标岗位生成技能需求画像，与技能提炼矩阵比对，导出待办笔记 |
 | `00_xyblue135-launcher` | 0.1.0 | Raycast 式插件启动台：居中浮层，搜索即达，卡片网格 |
-| `00_xyblue135-metadata-ai` | 0.9.3 | 用 OpenAI 兼容 API 维护 AI 摘要 / 标签 / 技术深度 / 时效性等 frontmatter 字段 |
+| `00_xyblue135-metadata-ai` | 0.10.0 | 用 OpenAI 兼容 API 维护 AI 摘要 / 标签 / 技术深度 / 时效性等 frontmatter 字段；**含模板补全**（新建笔记自动补齐缺失字段） |
 | `00_xyblue135-mirror` | 2.1.2 | 单层共享附件结构，同名笔记共享附件目录，引用计数保护删除 |
-| `00_xyblue135-skill-miner` | 0.10.2 | 把 frontmatter 变成技能资产：技能矩阵、AI 技术画像、模拟面试、简历生成 |
+| `00_xyblue135-skill-miner` | 0.11.0 | 把 frontmatter 变成技能资产：技能矩阵、AI 技术画像、模拟面试、简历生成；**含岗位透镜**（目标岗位画像 + 缺口比对） |
 | `00_xyblue135-theme` | 1.1.1 | 无需写 CSS 即可自定义背景 / 文字 / 链接 / 标题 / 代码 / 标签等样式 |
 | `00_xyblue135-undone-workbench` | 0.1.2 | 筛选 `status: undone` 笔记并逐篇引导处理（缺失项分析 / 联动补全） |
 | `00_xyblue135-video-triage` | 0.1.1 | B 站链接 → 字幕 → 要点 → 知识库比对 → 三档判定 → 自动写信箱笔记 |
+
+### 2026-11 的合并（17 → 14）
+
+三个插件被并入别处，不是功能被砍，而是**职责本来就重叠**——拆着反而要跨插件读对方的 `data.json`：
+
+| 被并入 | 并入到 | 为什么 |
+|---|---|---|
+| `docs-template`（元数据补全） | `metadata-ai` | 新建笔记补字段 vs 已有笔记补字段，是同一件事的两个时机；字段清单原本在 A 插件、字段顺序在 B 插件，靠启动顺序碰运气 |
+| `job-lens`（岗位透镜） | `skill-miner` | 岗位透镜只读 `skill-miner/data.json` 做比对，本质是这个插件的第二个视图 |
+| `interview-rag`（面试检索） | `ai-search` | 两套索引算法几乎逐行相同、白名单同一份、索引文件 4.6MB 各存一份；面试只是「另一套评分权重 + 一个文件握手」 |
+
+视图 id（`xyblue135-job-lens-view`）与旧 `data.json` 里的设置会自动迁移（`migratedFrom*` 标记防重跑），
+已打开的面板不会变空白；命令 id 变了（加了 `job-lens-` / `template-` / `iv-` 前缀），之前绑的热键要重绑。
 
 ## 打包的第三方插件
 
@@ -104,11 +114,10 @@ cp data.example.json data.json
 |---|---|---|
 | `ai-search` | `baseUrl` `apiKey` `model` | |
 | `docs-archiver` | `baseUrl` `apiKey` `model` | 1.0.3 起统一，旧 `ai*` 键自动迁移 |
-| `interview-rag` | `baseUrl` `apiKey` `model` | |
+| `ai-search`（面试模式） | 共用 `baseUrl` `apiKey`，模型单独 `ivModel` | 面试要快、要短，模型常与主检索不同；其余 `iv*` 键各有默认值 |
 | `metadata-ai` | `settings.baseUrl` `settings.apiKey` `settings.model` | 整份配置包在 `settings` 下 |
 | `skill-miner` | `settings.baseUrl` `settings.apiKey` `settings.model` | 同上 |
 | `skill-miner`（可选） | `settings.searchApiKey` | **不是** LLM 的 key，是 Tavily 搜索的 key，用途不同，保留独立字段 |
-| `job-lens` | 不单独存 | 直接复用 `skill-miner` 的配置 |
 
 > 为什么 `metadata-ai` / `skill-miner` 多一层 `settings.`：这两个插件把整个配置
 > 包在 `settings` 子对象里（含版本号、harness 提示词等上百个键），是它们的配置
