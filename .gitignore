@@ -32,6 +32,9 @@
 
 # -------- 插件运行时产物（可重建 / 体积大）--------
 */index.json
+*/index.json.bak
+*/index.overlay.json
+*/worker.json
 */reports/
 node_modules/
 */node_modules/

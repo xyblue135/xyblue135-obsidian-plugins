@@ -122,15 +122,16 @@ xyindex verify                   # 结构 / 一致性 / 死链 / 能否真 load(
 正常输出：
 
 ```
-  白名单外（不进索引）  31  vault 内 .md 共 796
+  白名单外（不进索引）  33  vault 内 .md 共 798
   进索引                765  whitelist = my_blog/00_docs,my_blog/00_agent_for_projects
     ├ 正文为空          14  只有 frontmatter，靠摘要文本检索
     ├ strongText 为空   0
     └ 带向量            0 / 765  embeddingEnabled 关闭
   正文总字数       2,134,665
   index.json       4.44 MB
+  补丁重放         2 篇  agent 写的内容已盖回索引
   fmFallback 标记  0  正常
-  耗时             0.8s
+  耗时             0.4s  onload 自动对账
 ```
 
 **判读标准**（任一条不对就继续查）
@@ -139,6 +140,22 @@ xyindex verify                   # 结构 / 一致性 / 死链 / 能否真 load(
 - `strongText 为空` 必须是 0。非 0 说明这些笔记连标题都没解析出来，搜不到
 - `fmFallback 标记` 必须是 0。非 0 表示写入时元数据没就绪，Obsidian 下次启动会把全部文档重解析一遍
 - `带向量` 只有开着 `embeddingEnabled` 时才应该 > 0
+
+### 补内容：scan → agent → apply
+
+索引里的摘要、别名标题靠 `rebuild` 是补不出来的（那需要读懂笔记）。这块交给 agent，
+程序只负责校验和落盘 —— 它不调模型接口，也不读 `apiKey`。
+
+```bash
+xyindex scan --out=work.json      # 列出「有正文但缺字段」的笔记，导出待填模板
+xyindex apply --from=work.json    # 校验后写回（同时写 index.overlay.json）
+```
+
+`apply` 写的内容落在补丁层 `index.overlay.json`，`rebuild` 重写 `index.json` 时会自动盖回去，
+所以 agent 的活不会因为一次重建就白干。字段上限与允许写入的字段见程序 README。
+
+只想让插件显示更好看、不折腾命令行的话，直接在笔记 frontmatter 里写
+`AI_summary_short` / `AI_tags` 也可以，`rebuild` 会读进去。
 
 ### 索引所有者：谁写 index.json
 
