@@ -3125,7 +3125,7 @@ class SkillMinerPlugin extends Plugin {
     this.matrix = null;
 
     this.addRibbonIcon('briefcase', '技能提炼', () => this.openPanel())
-      .addClass('xyblue135-ribbon xyblue135-ai');
+      .addClass('xyblue135-ribbon', 'xyblue135-ai');
     this.addCommand({ id: 'open-skill-miner', name: '打开技能提炼', callback: () => this.openPanel() });
     this.addCommand({ id: 'rebuild-skill-matrix', name: '重建技能矩阵', callback: () => this.rebuildMatrix(false) });
     this.addCommand({ id: 'start-interview', name: '开始模拟面试', callback: () => new InterviewModal(this).open() });
@@ -3134,7 +3134,7 @@ class SkillMinerPlugin extends Plugin {
        视图 id 与命令语义保持原样，只是命令 id 加了 job-lens- 前缀。 */
     this.registerView(JOB_LENS_VIEW_TYPE, (leaf) => new JobLensView(leaf, this));
     const jlRibbon = this.addRibbonIcon('compass', '岗位透镜', () => this.activateView());
-    jlRibbon.addClass('xyblue135-ribbon xyblue135-ai');
+    jlRibbon.addClass('xyblue135-ribbon', 'xyblue135-ai');
     this.addCommand({ id: 'job-lens-open', name: '岗位透镜：打开面板', callback: () => this.activateView() });
     this.addCommand({ id: 'job-lens-discover', name: '岗位透镜：岗位契合度发现（从技能矩阵反推）', callback: () => { void this.runDiscover(''); } });
     this.addCommand({ id: 'job-lens-export-todos', name: '岗位透镜：导出最近分析的缺口为收件箱待办', callback: () => { void this.exportTodos(); } });
@@ -3148,7 +3148,7 @@ class SkillMinerPlugin extends Plugin {
     });
     // 品牌分组标记（见 snippets/xyblue135-brand.css）
     const __brandEl = document.querySelector('.side-dock-ribbon-action[aria-label="' + '技能提炼' + '"]');
-    if (__brandEl) __brandEl.addClass('xyblue135-ribbon xyblue135-ai');
+    if (__brandEl) __brandEl.addClass('xyblue135-ribbon', 'xyblue135-ai');
   }
 
   openPanel() {

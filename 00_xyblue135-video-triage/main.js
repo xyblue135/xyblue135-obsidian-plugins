@@ -69,7 +69,7 @@ class VideoTriagePlugin extends obsidian_1.Plugin {
         this._queue = [];
         this._running = false;
         const ribbonEl = this.addRibbonIcon("monitor-play", "视频分诊", () => this.openModal());
-        ribbonEl.addClass("xyblue135-ribbon xyblue135-ai");
+        ribbonEl.addClass("xyblue135-ribbon", "xyblue135-ai");
         this.addCommand({ id: "open", name: "打开视频分诊", callback: () => this.openModal() });
         this.addCommand({ id: "triage-clipboard", name: "分诊剪贴板里的视频链接", callback: () => {
             navigator.clipboard.readText().then((t) => {

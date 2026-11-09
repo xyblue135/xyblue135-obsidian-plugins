@@ -68,7 +68,7 @@ module.exports = class FolderHiderPlugin extends Plugin {
     this.addRibbonIcon("eye-off", "文件夹隐藏 · 隐藏清单", () => {
       const list = Array.from(this.hiddenFolders);
       new Notice(list.length ? "当前隐藏的文件夹：\n" + list.join("\n") : "当前没有隐藏的文件夹。右键文件夹可隐藏/恢复。", 8000);
-    }).addClass("xyblue135-ribbon xyblue135-tool");
+    }).addClass("xyblue135-ribbon", "xyblue135-tool");
     this.addCommand({
       id: "unhide-all-folders",
       name: "取消隐藏全部文件夹",

@@ -1008,7 +1008,7 @@ class DocsNavPlugin extends obsidian_1.Plugin {
         await this.loadSettings();
         this.registerView(VIEW_TYPE, (leaf) => new NavView(leaf, this));
         const ribbonEl = this.addRibbonIcon("git-fork", "知识库导航图", () => this.activateView());
-        ribbonEl.addClass("xyblue135-ribbon xyblue135-ai");
+        ribbonEl.addClass("xyblue135-ribbon", "xyblue135-ai");
         this.addCommand({ id: "open", name: "打开知识库导航图", callback: () => this.activateView() });
         this.addSettingTab(new DocsNavSettingTab(this.app, this));
     }

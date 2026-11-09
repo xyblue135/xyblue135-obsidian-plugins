@@ -218,7 +218,7 @@ class LocalImageHoverZoomPlugin extends obsidian_1.Plugin {
             }
         });
         this.addSettingTab(new ImageHoverZoomSettingTab(this.app, this));
-        this.addRibbonIcon("zoom-in", "图片缩放 · 设置", () => { this.app.setting.open(); this.app.setting.openTabById("00_xyblue135-image-zoom"); }).addClass("xyblue135-ribbon xyblue135-tool");
+        this.addRibbonIcon("zoom-in", "图片缩放 · 设置", () => { this.app.setting.open(); this.app.setting.openTabById("00_xyblue135-image-zoom"); }).addClass("xyblue135-ribbon", "xyblue135-tool");
     }
     onunload() {
         var _a;

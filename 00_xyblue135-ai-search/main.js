@@ -536,6 +536,9 @@ class SearchIndex {
 
   saveIndexDebounced() {
     clearTimeout(this._saveTimer);
+    // 外部索引所有者模式：index.json 归 xyindex 等外部程序所有，插件只读。
+    // 文件事件仍会更新内存文档，但不落盘，否则会把外部程序写的索引（含补丁层内容）覆盖掉。
+    if (this.plugin.settings.indexOwner === 'external') return;
     this._saveTimer = setTimeout(() => {
       this.saveNow().catch((e) => {
         // 保存失败不再静默吞掉，否则用户只会看到索引莫名变 0 篇（2.5）
@@ -570,8 +573,15 @@ class SearchIndex {
         await adapter.rename(tmp, target);
         return;
       } catch (e) {
-        // 个别适配器无法覆盖已存在的目标文件：退回直接写入，避免索引一直保存不上（2.5）
-        console.warn('AI 检索：临时文件改名失败，改为直接写入 index.json', e);
+        // Obsidian 的 adapter.rename 拒绝覆盖已存在的文件（Windows 上每次保存都会失败）。
+        // 先删目标再改名，保留「先写临时文件」的原子性；删完仍失败才退回直接写入（2.5）。
+        try {
+          await adapter.remove(target);
+          await adapter.rename(tmp, target);
+          return;
+        } catch (e2) {
+          console.debug('AI 检索：改名不可用，改为直接写入 index.json', e2 && e2.message);
+        }
       }
     }
     await adapter.write(target, text);
@@ -2400,14 +2410,14 @@ class AISearchPlugin extends Plugin {
     // 用 addRibbonIcon 的返回值直接打类：比 querySelector 按 aria-label 二次查找可靠
     // （那边一旦改了图标文案就静默失效）。
     this.addRibbonIcon('search', 'AI 检索', () => this.openSearch())
-      .addClass('xyblue135-ribbon xyblue135-ai');
+      .addClass('xyblue135-ribbon', 'xyblue135-ai');
     this.addCommand({
       id: 'open-ai-search',
       name: '打开 AI 检索',
       callback: () => this.openSearch(),
     });
     this.addRibbonIcon('graduation-cap', '面试问答控制台', () => this.ivOpenConsole())
-      .addClass('xyblue135-ribbon xyblue135-ai');
+      .addClass('xyblue135-ribbon', 'xyblue135-ai');
     this.addCommand({
       id: 'rebuild-ai-search-index',
       name: '重建检索索引',

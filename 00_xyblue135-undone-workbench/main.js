@@ -321,7 +321,7 @@ class UndoneWorkbenchPlugin extends obsidian_1.Plugin {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
         this.registerView(VIEW_TYPE, (leaf) => new WorkbenchView(leaf, this));
         const ribbonEl = this.addRibbonIcon("list-todo", "待完成工作台", () => this.activateView());
-        ribbonEl.addClass("xyblue135-ribbon xyblue135-ai");
+        ribbonEl.addClass("xyblue135-ribbon", "xyblue135-ai");
         this.addCommand({ id: "open", name: "打开待完成工作台", callback: () => this.activateView() });
         this.addSettingTab(new WorkbenchSettingTab(this.app, this));
     }

@@ -119,7 +119,7 @@ class DocsArchiverPlugin extends obsidian.Plugin {
 		});
     // 品牌分组标记（见 snippets/xyblue135-brand.css）
     const __brandEl = document.querySelector('.side-dock-ribbon-action[aria-label="' + '归档当前笔记' + '"]');
-    if (__brandEl) __brandEl.addClass('xyblue135-ribbon xyblue135-ai');
+    if (__brandEl) __brandEl.addClass('xyblue135-ribbon', 'xyblue135-ai');
 
 		this.registerEvent(
 			this.app.workspace.on('file-menu', (menu, file) => {

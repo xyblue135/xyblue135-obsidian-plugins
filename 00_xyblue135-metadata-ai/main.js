@@ -1226,7 +1226,7 @@ module.exports = class AiMetadataPlugin extends Plugin {
     this.refreshStatusBar();
 
     this.addSettingTab(new AiMetadataSettingTab(this.app, this));
-    this.addRibbonIcon("tags", "AI 元数据 · 待更新面板", () => this.openPendingNotesDashboard()).addClass("xyblue135-ribbon xyblue135-ai");
+    this.addRibbonIcon("tags", "AI 元数据 · 待更新面板", () => this.openPendingNotesDashboard()).addClass("xyblue135-ribbon", "xyblue135-ai");
 
     this.addCommand({
       id: "generate-summary",

@@ -268,7 +268,7 @@ module.exports = class MirrorAttachmentsPlugin extends Plugin {
     await this.migrateLegacyFlatAttachmentRootIfNeeded();
     await this.migratePluginTrashToSystemTrash();
     this.addSettingTab(new MirrorAttachmentsSettingTab(this.app, this));
-    this.addRibbonIcon("images", "附件镜像 · 设置", () => { this.app.setting.open(); this.app.setting.openTabById("00_xyblue135-mirror"); }).addClass("xyblue135-ribbon xyblue135-tool");
+    this.addRibbonIcon("images", "附件镜像 · 设置", () => { this.app.setting.open(); this.app.setting.openTabById("00_xyblue135-mirror"); }).addClass("xyblue135-ribbon", "xyblue135-tool");
 
     // v2.1：同名笔记默认静默共享附件目录，事后很难发现；
     // 这里给一个随时可查的入口（设置页“重复文件名”面板里也有同款按钮）。

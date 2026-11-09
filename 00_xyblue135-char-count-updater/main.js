@@ -62,7 +62,7 @@ class CharCountUpdaterPlugin extends Plugin {
     await this.loadSettings();
 
     this.addSettingTab(new CharCountSettingTab(this.app, this));
-    this.addRibbonIcon("hash", "Token 统计 · 设置", () => { this.app.setting.open(); this.app.setting.openTabById("00_xyblue135-char-count-updater"); }).addClass("xyblue135-ribbon xyblue135-tool");
+    this.addRibbonIcon("hash", "Token 统计 · 设置", () => { this.app.setting.open(); this.app.setting.openTabById("00_xyblue135-char-count-updater"); }).addClass("xyblue135-ribbon", "xyblue135-tool");
 
     this.app.workspace.onLayoutReady(() => {
       // 插件可能在库加载完成前就被停用，此时不要再向已卸载的实例注册全局监听

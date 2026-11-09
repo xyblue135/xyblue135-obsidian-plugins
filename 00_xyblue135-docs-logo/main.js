@@ -67,6 +67,8 @@ module.exports = class xyblue135NotesStatusPlugin extends Plugin {
     this.lastCssSignature = ""; // 7.3：用轻量签名判断是否需要重建整份 CSS
     this.pendingRescansLeft = 3; // 7.5：待定项的兜底重扫次数
     this.pendingRescanTimer = null;
+    this.missingRootAttempts = new Map(); // 白名单目录连续未找到次数：启动早期静默重试，避免假警报
+    this.missingRootTimer = null;
     this.lastSkippedSignature = ""; // 7.4：非 .md 文件只做调试记录，不告警
 
     this.styleEl = document.getElementById(STYLE_ID);
@@ -95,7 +97,7 @@ module.exports = class xyblue135NotesStatusPlugin extends Plugin {
 
     this.addRibbonIcon("sticker", "文件 Logo · 重载白名单", () => {
       this.app.commands.executeCommandById("00_xyblue135-docs-logo:reload-whitelist-and-icons");
-    }).addClass("xyblue135-ribbon xyblue135-tool");
+    }).addClass("xyblue135-ribbon", "xyblue135-tool");
     this.addCommand({
       id: "refresh-whitelist-status",
       name: "刷新白名单状态图标",
@@ -196,6 +198,7 @@ module.exports = class xyblue135NotesStatusPlugin extends Plugin {
       this.whitelistRoots = this.minimizeRoots(
         values.map((v) => this.normalizeConfigPath(v)).filter(Boolean)
       );
+      this.missingRootAttempts.clear(); // 白名单变了，重试计数归零
     } catch (e) {
       this.whitelistRoots = [];
       console.warn("xyblue135 私人·笔记状态： whitelist.json missing or invalid", e, this.whitelistPath);
@@ -457,11 +460,25 @@ module.exports = class xyblue135NotesStatusPlugin extends Plugin {
       const root = this.app.vault.getAbstractFileByPath(rootPath);
 
       if (!root) {
-        // 7.4 附带：非 .md 文件不再告警后，这里要保留真实异常的声音 ——
-        // 白名单里写了不存在的目录时整棵树都会空着，必须能从控制台看出原因。
-        console.warn(`xyblue135 私人·笔记状态：白名单目录不存在，已跳过：${rootPath}`);
+        // 启动瞬间文件树可能还没就绪（onLayoutReady 早于 folder 进入 fileMap），
+        // 这时直接告警会每天刷一条假警报：前两次静默重试，第三次仍缺失才说话。
+        const attempts = (this.missingRootAttempts.get(rootPath) || 0) + 1;
+        this.missingRootAttempts.set(rootPath, attempts);
+        if (attempts >= 3) {
+          // 7.4 附带：非 .md 文件不再告警后，这里要保留真实异常的声音 ——
+          // 白名单里写了不存在的目录时整棵树都会空着，必须能从控制台看出原因。
+          console.warn(`xyblue135 私人·笔记状态：白名单目录不存在，已跳过：${rootPath}`);
+        } else if (!this.missingRootTimer) {
+          this.missingRootTimer = this.registerInterval(
+            window.setTimeout(() => {
+              this.missingRootTimer = null;
+              this.rebuildStyles();
+            }, 1500)
+          );
+        }
         continue;
       }
+      this.missingRootAttempts.delete(rootPath);
 
       if (!(root instanceof TFolder)) {
         console.warn(`xyblue135 私人·笔记状态： whitelist entry is not a folder: ${rootPath}`);
